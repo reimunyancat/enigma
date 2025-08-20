@@ -119,10 +119,10 @@ public:
     Plugboard plugboard;
 
     // 기계 초기화
-    // rotorNames: 사용 로터 이름 (예: {"I","II","III"})
+    // rotorNames: 사용 로터 이름
     // reflectorName: 반사판 이름
     // ringSettings: 링 설정값들 (각각 1~26)
-    // startPositions: 시작 위치 (예: "ABC")
+    // startPositions: 시작 위치
     // plugPairs: 플러그보드 연결 쌍
     EnigmaMachine(const vector<string> &rotorNames,
                   const string &reflectorName,
@@ -220,21 +220,22 @@ public:
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
+    cout.tie(nullptr);
 
     // 예시: 3로터 (왼→오): I, II, III, 반사판 B
     // 링 설정: {1,1,1}
     // 시작 위치: "AAA"
     vector<string> rotorNames = {"I","II","III"};
     string reflectorName = "B";
-    vector<int> ringSettings = {1,1,1};
-    string startPositions = "AAA";
+    vector<int> ringSettings = {1,5,2};
+    string startPositions = "TOU";
 
     // 플러그보드 설정
-    vector<pair<char,char>> plugs = {{'A','B'},{'C','D'}};
+    vector<pair<char,char>> plugs = {{'A','B'},{'C','D'}, {'X', 'Z'}};
 
     EnigmaMachine machine(rotorNames, reflectorName, ringSettings, startPositions, plugs);
 
-    string plaintext = "HELLO WORLD";
+    string plaintext = "TOUHOU";
     string cipher = machine.encrypt(plaintext);
 
     cout << "Plain : " << plaintext << "\n";
