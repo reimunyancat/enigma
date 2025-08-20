@@ -7,16 +7,15 @@ inline char chr(int i) { return 'A' + (i % 26 + 26) % 26; }
 
 struct RotorSpec {
     string name;
-    string wiring;   // 26개의 알파벳으로 된 배선표 (입력 A는 wiring[0]으로 연결)
-    char notch;      // 로터가 특정 위치에 도달했을 때 다음 로터를 한 칸 밀어주는 지점
+    string wiring;
+    char notch;
 };
 
 struct ReflectorSpec {
     string name;
-    string wiring; // 반사판의 배선표 (26자, 항상 대칭적으로 연결되어 있음)
+    string wiring;
 };
 
-// 로터와 반사판 정의
 static const vector<RotorSpec> rotorSpecs = {
     {"I",   "EKMFLGDQVZNTOWYHXUSPAIBRCJ", 'Q'},
     {"II",  "AJDKSIRUXBLHWTMCQGZNPYFVOE", 'E'},
@@ -44,9 +43,9 @@ struct Plugboard {
 class Rotor {
 public:
     string name;
-    array<int,26> forwardMap;  // 정방향 매핑 (입력 → 출력)
-    array<int,26> backwardMap; // 역방향 매핑 (출력 → 입력)
-    int ringSetting = 0;       // 링 설정(0~25). 사용자는 보통 1~26으로 입력 → 코드에서는 -1 해서 저장
+    array<int,26> forwardMap;  // 정방향
+    array<int,26> backwardMap; // 역방향
+    int ringSetting = 0;       // 링 설정(0~25). 1~26으로 입력 → 코드에서는 -1 해서 저장
     int pos = 0;               // 현재 로터의 물리적 위치 (0=A, 25=Z)
     char notch;                // 다음 로터를 움직이게 만드는 위치 표시
 
@@ -100,7 +99,7 @@ public:
 
 class EnigmaMachine {
 public:
-    vector<Rotor> rotors;   // 왼쪽 → 오른쪽 순서
+    vector<Rotor> rotors;
     Reflector reflector;
     Plugboard plugboard;
 
@@ -184,7 +183,7 @@ int main() {
 
     vector<string> rotorNames = {"I","II","III"};
     string reflectorName = "B";
-    vector<int> ringSettings = {1,5,2};
+    vector<int> ringSettings = {8,11,21};
     vector<int> startPositions = {19,14,20};
 
     vector<pair<char,char>> plugs = {{'A','B'},{'C','D'}, {'X', 'Z'}};
