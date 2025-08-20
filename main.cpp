@@ -1,4 +1,10 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <array>
+#include <algorithm>
+#include <stdexcept>
+#include <utility>
 
 using namespace std;
 
