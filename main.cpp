@@ -51,7 +51,7 @@ public:
     string name;
     array<int,26> forwardMap;  // 정방향
     array<int,26> backwardMap; // 역방향
-    int ringSetting = 0;       // 링 설정(0~25). 1~26으로 입력 → 코드에서는 -1 해서 저장
+    int ringSetting = 0;       // 링 설정(0~25)
     int pos = 0;               // 현재 로터의 물리적 위치 (0=A, 25=Z)
     char notch;                // 다음 로터를 움직이게 만드는 위치 표시
 
@@ -111,8 +111,8 @@ public:
 
     EnigmaMachine(const vector<string> &rotorNames,
                   const string &reflectorName,
-                  const vector<int> &ringSettings,
-                  const vector<int> &startPositions,
+                  const vector<char> &ringSettings,
+                  const vector<char> &startPositions,
                   const vector<pair<char,char>> &plugPairs = {})
     {
         for (size_t i=0;i<rotorNames.size();++i) {
@@ -120,7 +120,11 @@ public:
             auto it = find_if(rotorSpecs.begin(), rotorSpecs.end(),
                 [&](const RotorSpec &rs){ return rs.name==rn; });
             if (it==rotorSpecs.end()) throw runtime_error("Unknown rotor: "+rn);
-            Rotor r(*it, ringSettings[i], startPositions[i]);
+
+            int rs = idx(ringSettings[i]) + 1; // 'A'=1, 'B'=2 …
+            int sp = idx(startPositions[i]);   // 'A'=0, 'B'=1 …
+
+            Rotor r(*it, rs, sp);
             rotors.push_back(r);
         }
         auto rit = find_if(reflectorSpecs.begin(), reflectorSpecs.end(),
@@ -189,8 +193,9 @@ int main() {
 
     vector<string> rotorNames = {"I","II","III"};
     string reflectorName = "B";
-    vector<int> ringSettings = {8,11,21};
-    vector<int> startPositions = {19,14,20};
+
+    vector<char> ringSettings   = {'T','O','U'};
+    vector<char> startPositions = {'H','O','U'};
 
     vector<pair<char,char>> plugs = {{'A','B'},{'C','D'}, {'X', 'Z'}};
 
