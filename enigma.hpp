@@ -167,4 +167,20 @@ public:
     }
 
     void addPlugPair(char a, char b) { plugboard.addPair(a,b); }
+    
+    string tracePath(char ch) {
+    if (ch < 'A' || ch > 'Z') return "";
+    stepRotors();
+    int n = (int)rotors.size();
+    string out;
+    auto add = [&](int v){ if (!out.empty()) out += ","; out += to_string(v); };
+    int c = idx(ch);
+    add(c);
+    c = plugboard.forward(c); add(c);
+    for (int i = n-1; i >= 0; --i) { c = rotors[i].forward(c); add(c); }
+    c = reflector.reflect(c); add(c);
+    for (int i = 0; i < n; ++i) { c = rotors[i].backward(c); add(c); }
+    c = plugboard.forward(c); add(c);
+    return out;
+}
 };

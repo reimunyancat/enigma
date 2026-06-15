@@ -57,4 +57,12 @@ const char* enigma_positions() {
     return buf;
 }
 
+EMSCRIPTEN_KEEPALIVE
+const char* enigma_trace(char c) {
+    static string buf;
+    if (!g_machine) { buf = ""; return buf.c_str(); }
+    buf = g_machine->tracePath(c);
+    return buf.c_str();
+}
+
 }
