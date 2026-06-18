@@ -29,11 +29,19 @@
 <style>
   .bar { width: 100%; display: flex; justify-content: center; }
   .io {
-    display: flex; gap: 30px; justify-content: center;
+    display: flex; flex-direction: column; gap: 6px;
+    width: 360px; margin: 14px auto 0;
     font-family: ui-monospace, monospace;
   }
-  .lbl { font-size: 11px; opacity: .6; letter-spacing: 1px; margin-right: 8px; }
-  .val { letter-spacing: 3px; word-break: break-all; font-size: 15px; }
+  .io > div { display: flex; align-items: baseline; }
+  .lbl {
+    width: 36px; flex: none;
+    font-size: 11px; opacity: .6; letter-spacing: 1px;
+  }
+  .val {
+    letter-spacing: 3px; word-break: break-all;
+    font-size: 15px; text-align: left;
+  }
   .cipher { color: var(--brass); }
   .loading { text-align: center; opacity: .7; }
   .err { color: #ff8a7a; font-size: 13px; text-align: center; }
