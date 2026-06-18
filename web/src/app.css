@@ -1,37 +1,37 @@
 :root {
-  --wood1: #3a2417;
-  --wood2: #4a2f1d;
-  --wood3: #5c3a24;
+  --wood1: #6b4a2b;
+  --wood2: #3c2817;
+  --wood3: #241509;
+  --metal2: #8a8f96;
+  --metal3: #54585e;
   --brass: #c9a24b;
-  --metal2: #2a2a2e;
-  --metal3: #3a3a40;
-  --lamp-off: #5a5034;
-  --lamp-on: #ffd34d;
-  --wire: #6b7280;
-  --wire-glow: #ffd34d;
-  --accent: #4ea3ff;
-  --txt: #f3e9d2;
+  --lamp-off: #3a3520;
+  --lamp-on: #ffe169;
+  --wire: #ffcf4d;
+  --wire-glow: #fff2b0;
+  --accent: #5fc6ff;
+  --txt: #ecdfc4;
 }
-
 * {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
-  min-height: 100vh;
-  background: radial-gradient(circle at 50% 0%, #1a1410, #0c0a08);
+  height: 100vh;
+  padding: 12px 14px;
+  font-family: "Segoe UI", system-ui, sans-serif;
   color: var(--txt);
-  font-family: "Inter", system-ui, sans-serif;
-  display: flex;
-  justify-content: center;
+  background: radial-gradient(
+    120% 80% at 50% -10%,
+    #2a2622,
+    #141210 70%,
+    #0b0a09
+  );
 }
-
 #app {
-  width: 100%;
-  max-width: 920px;
-  padding: 24px 16px 80px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
 }

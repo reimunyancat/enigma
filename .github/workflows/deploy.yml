@@ -1,0 +1,36 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build WASM
+        run: |
+          emcc wasm.cpp -O2 -fexceptions --no-entry \
+            -sMODULARIZE=1 -sEXPORT_ES6=1 -sSINGLE_FILE=1 \
+            -sEXPORTED_RUNTIME_METHODS=ccall,cwrap \
+            -o web/src/enigma.mjs
+      - name: Build web
+        run: cd web && npm install && npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

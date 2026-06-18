@@ -1,49 +1,65 @@
 <script lang="ts">
-  import { config, patch } from "../machine"
+  import { config, apply } from "../machine"
   import type { Rotor, Reflector } from "../engine"
 
-  const ROTORS: Rotor[] = ["I", "II", "III", "IV", "V"]
-  const REFLECTORS: Reflector[] = ["A", "B", "C"]
+  const ROTORS:     Rotor[]     = ["I","II","III","IV","V"]
+  const REFLECTORS: Reflector[] = ["A","B","C"]
+
+  const clean = (v: string, n: number) =>
+    v.toUpperCase().replace(/[^A-Z]/g, "").slice(0, n)
 
   function setRotor(i: number, v: string) {
-    const r = [...$config.rotors] as [Rotor, Rotor, Rotor]
-    r[i] = v as Rotor
-    patch({ rotors: r })
+    config.update((c) => {
+      const r = [...c.rotors] as [Rotor, Rotor, Rotor]
+      r[i] = v as Rotor
+      return { ...c, rotors: r }
+    })
+    apply()
   }
-  const up = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "")
 </script>
 
 <div class="cfg">
-  {#each [0, 1, 2] as i}
-    <label>로터 {i + 1}
-      <select value={$config.rotors[i]} on:change={(e) => setRotor(i, e.currentTarget.value)}>
-        {#each ROTORS as opt}<option value={opt}>{opt}</option>{/each}
-      </select>
-    </label>
-  {/each}
-
-  <label>반사판
-    <select value={$config.reflector} on:change={(e) => patch({ reflector: e.currentTarget.value as Reflector })}>
+  <div class="field">
+    <label>로터 (왼·가운데·오른쪽)</label>
+    <div class="row">
+      {#each $config.rotors as r, i}
+        <select value={r} on:change={(e) => setRotor(i, e.currentTarget.value)}>
+          {#each ROTORS as opt}<option value={opt}>{opt}</option>{/each}
+        </select>
+      {/each}
+    </div>
+  </div>
+  <div class="field">
+    <label>리플렉터</label>
+    <select bind:value={$config.reflector} on:change={apply}>
       {#each REFLECTORS as opt}<option value={opt}>{opt}</option>{/each}
     </select>
-  </label>
-
-  <label>링 설정
-    <input maxlength="3" value={$config.rings}
-      on:change={(e) => patch({ rings: up(e.currentTarget.value).padEnd(3, "A").slice(0, 3) })} />
-  </label>
-
-  <label>시작 위치
-    <input maxlength="3" value={$config.positions}
-      on:change={(e) => patch({ positions: up(e.currentTarget.value).padEnd(3, "A").slice(0, 3) })} />
-  </label>
+  </div>
+  <div class="field">
+    <label>링 세팅</label>
+    <input class="tri" maxlength="3" value={$config.rings}
+      on:input={(e) => { $config.rings = clean(e.currentTarget.value, 3); apply() }} />
+  </div>
+  <div class="field">
+    <label>초기 위치</label>
+    <input class="tri" maxlength="3" value={$config.positions}
+      on:input={(e) => { $config.positions = clean(e.currentTarget.value, 3); apply() }} />
+  </div>
+  <div class="field">
+    <label>플러그보드</label>
+    <input class="pl" value={$config.plugs}
+      on:input={(e) => { $config.plugs = clean(e.currentTarget.value, 26); apply() }} />
+  </div>
 </div>
 
 <style>
-  .cfg { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
-  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--brass); }
-  select, input {
-    background: var(--metal2); color: var(--txt); border: 1px solid #000;
-    border-radius: 6px; padding: 6px 8px; font-size: 14px; width: 84px; text-transform: uppercase;
-  }
+  .cfg { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+    background: rgba(0,0,0,.22); border: 1px solid var(--wood3); border-radius: 10px; padding: 12px 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  label { font-size: 11px; opacity: .7; letter-spacing: 1px; }
+  .row { display: flex; gap: 6px; }
+  select, input { background: #100b06; color: var(--txt); border: 1px solid var(--wood3);
+    border-radius: 7px; padding: 7px 9px; font-size: 14px; font-family: inherit; }
+  .tri { width: 76px; text-align: center; text-transform: uppercase; letter-spacing: 4px; }
+  .pl  { width: 160px; text-transform: uppercase; letter-spacing: 2px; }
 </style>
