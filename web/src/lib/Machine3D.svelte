@@ -376,6 +376,7 @@
     const LAMPZ = [0.9, -0.2, -1.3];
     const lampMats: Record<string, THREE.MeshStandardMaterial> = {};
     const lampLabels: Record<string, THREE.MeshBasicMaterial> = {};
+    const lampPos: Record<string, THREE.Vector3> = {};
     const lampHoleGeo = new THREE.CylinderGeometry(0.33, 0.35, 0.08, 28);
     const lampGeo = new THREE.CylinderGeometry(0.27, 0.27, 0.07, 28);
     ROWS.forEach((row, r) => {
@@ -408,6 +409,7 @@
         scene.add(lab);
         lampMats[ch] = mat;
         lampLabels[ch] = lab.material as THREE.MeshBasicMaterial;
+        lampPos[ch] = new THREE.Vector3(x, TOP + 0.09, z);
       });
     });
 
@@ -795,7 +797,20 @@
         return;
       }
       const p = tr.path;
-      const v = [
+      const inCh = get(lastKey);
+      const keyGrp = inCh ? keyGroups[inCh] : null;
+      const v: THREE.Vector3[] = [];
+      if (keyGrp) {
+        v.push(keyGrp.position.clone().setY(TOP + 0.12));
+        v.push(
+          new THREE.Vector3(
+            keyGrp.position.x * 0.6,
+            rotorY - 1.4,
+            (keyGrp.position.z + rotorZ) / 2,
+          ),
+        );
+      }
+      v.push(
         contact(CX.etw + 0.2, p[1]),
         contact(CX.R + FACE, p[1]),
         contact(CX.R - FACE, p[2]),
@@ -813,7 +828,18 @@
         contact(CX.R + FACE, p[8]),
         contact(CX.etw - 0.2, p[8]),
         contact(CX.etw + 0.2, p[9]),
-      ];
+      );
+      const outLamp = lampPos[tr.output];
+      if (outLamp) {
+        v.push(
+          new THREE.Vector3(
+            outLamp.x * 0.6,
+            rotorY - 1.4,
+            (outLamp.z + rotorZ) / 2,
+          ),
+        );
+        v.push(outLamp.clone());
+      }
       activeCurve = new THREE.CatmullRomCurve3(v);
       const tube = new THREE.TubeGeometry(activeCurve, 220, 0.045, 8, false);
       active = new THREE.Mesh(
