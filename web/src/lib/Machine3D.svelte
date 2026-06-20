@@ -857,6 +857,7 @@
         mat.depthWrite = !on;
         mat.depthTest = true;
         mat.emissive.setHex(on ? 0x3a2814 : 0x000000);
+        mat.needsUpdate = true;
       });
       innerLight.intensity = on ? 26 : 0;
       wiring.visible = on;
