@@ -12,6 +12,8 @@
     press,
     xray,
     lastTrace,
+    lid,
+    patch,
   } from "../machine";
   import { get } from "svelte/store";
   import {
@@ -167,55 +169,56 @@
     // ── 재질 ──
     const woodMat = new THREE.MeshStandardMaterial({
       map: woodMap,
-      roughness: 0.58,
-      metalness: 0.0,
-      envMapIntensity: 0.6,
+      color: 0xd6b083,
+      roughness: 0.72,
+      metalness: 0.04,
+      envMapIntensity: 0.38,
     });
     const woodDark = new THREE.MeshStandardMaterial({
-      color: 0x3a2412,
-      roughness: 0.62,
-      metalness: 0.0,
-      envMapIntensity: 0.5,
+      color: 0x2a1809,
+      roughness: 0.74,
+      metalness: 0.04,
+      envMapIntensity: 0.32,
     });
     const brassMat = new THREE.MeshStandardMaterial({
-      color: 0xc9a24b,
-      roughness: 0.28,
-      metalness: 0.95,
-      envMapIntensity: 1.0,
+      color: 0xb18a3c,
+      roughness: 0.36,
+      metalness: 1.0,
+      envMapIntensity: 0.85,
     });
     const brassDk = new THREE.MeshStandardMaterial({
-      color: 0x9c7a33,
-      roughness: 0.4,
-      metalness: 0.9,
-      envMapIntensity: 0.9,
+      color: 0x83662a,
+      roughness: 0.48,
+      metalness: 0.95,
+      envMapIntensity: 0.75,
     });
     const steelMat = new THREE.MeshStandardMaterial({
-      color: 0xb8bcc2,
-      roughness: 0.3,
-      metalness: 0.9,
-      envMapIntensity: 1.0,
+      color: 0xa6abb2,
+      roughness: 0.4,
+      metalness: 0.95,
+      envMapIntensity: 0.9,
     });
     const bakeMat = new THREE.MeshStandardMaterial({
-      color: 0x14110d,
-      roughness: 0.38,
-      metalness: 0.3,
-      envMapIntensity: 0.7,
-    });
-    const panelMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1610,
-      roughness: 0.5,
-      metalness: 0.35,
+      color: 0x0f0c08,
+      roughness: 0.32,
+      metalness: 0.4,
       envMapIntensity: 0.6,
     });
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x131009,
+      roughness: 0.58,
+      metalness: 0.4,
+      envMapIntensity: 0.5,
+    });
     const darkMat = new THREE.MeshStandardMaterial({
-      color: 0x09070a,
-      roughness: 0.85,
-      metalness: 0.1,
+      color: 0x070509,
+      roughness: 0.88,
+      metalness: 0.12,
     });
     const cableMat = new THREE.MeshStandardMaterial({
-      color: 0x161616,
-      roughness: 0.75,
-      metalness: 0.05,
+      color: 0x121212,
+      roughness: 0.8,
+      metalness: 0.06,
     });
 
     const TOP = 1.1;
@@ -247,13 +250,13 @@
       new RoundedBoxGeometry(12.5, 1.7, 3.0, 4, 0.18),
       woodMat,
     );
-    housing.position.set(0, 1.1, -3.3);
+    housing.position.set(0, 1.1, -3.6);
     scene.add(housing);
     const trough = new THREE.Mesh(
       new THREE.BoxGeometry(9.0, 0.6, 1.85),
       darkMat,
     );
-    trough.position.set(-0.1, 1.4, -3.3);
+    trough.position.set(-0.1, 1.4, -3.6);
     scene.add(trough);
 
     // 모서리 브라스 리벳
@@ -276,6 +279,7 @@
     const PB_Y = [0.45, -0.45, -1.35];
     const PB_DX = 1.06;
     const socketPos: Record<string, THREE.Vector3> = {};
+    const socketHits: THREE.Mesh[] = [];
     const socketPlateGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.12, 24);
     const socketRingGeo = new THREE.TorusGeometry(0.24, 0.035, 10, 24);
     const holeGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.18, 12);
@@ -287,10 +291,14 @@
         const plate = new THREE.Mesh(socketPlateGeo, panelMat);
         plate.rotation.x = Math.PI / 2;
         plate.position.set(x, y, PB_Z);
+        plate.userData.ch = ch;
         scene.add(plate);
+        socketHits.push(plate);
         const ring = new THREE.Mesh(socketRingGeo, brassMat);
         ring.position.set(x, y, PB_Z + 0.04);
+        ring.userData.ch = ch;
         scene.add(ring);
+        socketHits.push(ring);
         for (const dy of [0.1, -0.1]) {
           const hole = new THREE.Mesh(holeGeo, darkMat);
           hole.rotation.x = Math.PI / 2;
@@ -340,6 +348,33 @@
         );
         cableGroup.add(tube);
       }
+    }
+
+    function plugPairs(s: string): string[] {
+      const t = (s || "").toUpperCase().replace(/[^A-Z]/g, "");
+      const out: string[] = [];
+      const seen = new Set<String>();
+      for (let i = 0; i + 1 < t.length; i += 2) {
+        const a = t[i],
+          b = t[i + 1];
+        if (a === b || seen.has(a) || seen.has(b)) continue;
+        seen.add(a);
+        seen.add(b);
+        out.push(a + b);
+      }
+      return out;
+    }
+    function connectPlug(a: string, b: string) {
+      if (a === b) return;
+      const pairs = plugPairs(get(config).plugs).filter(
+        (p) => !p.includes(a) && p.includes(b),
+      );
+      pairs.push(a + b);
+      patch({ plugs: pairs.join("") });
+    }
+    function disconnectPlug(ch: string) {
+      const pairs = plugPairs(get(config).plugs).filter((p) => !p.includes(ch));
+      patch({ plugs: pairs.join("") });
     }
 
     // ── 키보드 ──
@@ -416,7 +451,7 @@
     // ── 로터  ──
     const rotorX = [-0.95, 0, 0.95];
     const rotorY = 1.82;
-    const rotorZ = -3.3;
+    const rotorZ = -3.6;
     const rotorSpins: THREE.Group[] = [];
     const targetRot = [0, 0, 0];
     for (let r = 0; r < 3; r++) {
@@ -600,7 +635,9 @@
     logo.rotation.x = -Math.PI / 2;
     logo.position.set(0, 0.2, 4.0);
     lidPivot.add(logo);
-    lidPivot.rotation.x = -2.05;
+    const LID_OPEN = -1.65;
+    const LID_SHUT = -0.02;
+    lidPivot.rotation.x = LID_OPEN;
     // 경첩 barrels
     for (const sx of [-3.6, 3.6]) {
       const barrel = new THREE.Mesh(
@@ -861,13 +898,13 @@
       new RoundedBoxGeometry(1.0, 0.9, 2.0, 3, 0.1),
       woodMat.clone(),
     );
-    reflCover.position.set(-1.9, 2.1, -3.3);
+    reflCover.position.set(-1.9, 2.1, -3.6);
     scene.add(reflCover);
     const etwCover = new THREE.Mesh(
       new RoundedBoxGeometry(1.0, 0.9, 2.0, 3, 0.1),
       woodMat.clone(),
     );
-    etwCover.position.set(1.9, 2.1, -3.3);
+    etwCover.position.set(1.9, 2.1, -3.6);
     scene.add(etwCover);
 
     const xrayShells = [body, topPanel, housing, trough, pbPanel];
@@ -895,6 +932,7 @@
     rebuildBraid();
 
     let pressedCh: string | null = null;
+    let lidOpen = true;
     const unsubs = [
       rotorPos.subscribe((p) => {
         (updateRotors(p), rebuildBraid());
@@ -909,6 +947,9 @@
       }),
       lastTrace.subscribe((t) => buildActive(t)),
       xray.subscribe((on) => setXray(on)),
+      lid.subscribe((v) => {
+        lidOpen = v;
+      }),
     ];
 
     // ── 포인터 타건 ──
@@ -916,16 +957,86 @@
     const ndc = new THREE.Vector2();
     let downX = 0,
       downY = 0;
+    let dragFrom: string | null = null;
+    const dragPreview = new THREE.Group();
+    scene.add(dragPreview);
+    const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -PB_Z);
+    const planeHit = new THREE.Vector3();
+    function clearPreview() {
+      while (dragPreview.children.length) {
+        const c = dragPreview.children.pop() as THREE.Mesh;
+        c.geometry.dispose();
+        (c.material as THREE.Material).dispose();
+      }
+    }
+    function drawPreview(from: THREE.Vector3, to: THREE.Vector3) {
+      clearPreview();
+      const mid = from.clone().add(to).multiplyScalar(0.5);
+      mid.z += 1.2;
+      mid.y -= 0.4;
+      const curve = new THREE.CatmullRomCurve3([from, mid, to]);
+      dragPreview.add(
+        new THREE.Mesh(
+          new THREE.TubeGeometry(curve, 32, 0.05, 8, false),
+          new THREE.MeshStandardMaterial({
+            color: 0xffcf4d,
+            emissive: 0xffcf4d,
+            emissiveIntensity: 0.8,
+            transparent: true,
+            opacity: 0.85,
+          }),
+        ),
+      );
+    }
     function toNdc(e: PointerEvent) {
       const rect = renderer.domElement.getBoundingClientRect();
       ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     }
+    function socketAt(e: PointerEvent): string | null {
+      toNdc(e);
+      ray.setFromCamera(ndc, camera);
+      const h = ray.intersectObjects(socketHits, false);
+      return h.length ? (h[0].object.userData.ch as string) : null;
+    }
     function onDown(e: PointerEvent) {
       downX = e.clientX;
       downY = e.clientY;
+      const ch = socketAt(e);
+      if (ch) {
+        dragFrom = ch;
+        controls.enabled = false;
+      }
+    }
+    function onMove(e: PointerEvent) {
+      if (!dragFrom) return;
+      const from = socketPos[dragFrom];
+      const over = socketAt(e);
+      let to: THREE.Vector3;
+      if (over && over !== dragFrom) {
+        to = socketPos[over];
+      } else {
+        toNdc(e);
+        ray.setFromCamera(ndc, camera);
+        ray.ray.intersectPlane(dragPlane, planeHit);
+        to = planeHit;
+      }
+      drawPreview(from, to);
     }
     function onUp(e: PointerEvent) {
+      if (dragFrom) {
+        const moved = Math.hypot(e.clientX - downX, e.clientY - downY) > 6;
+        const target = socketAt(e);
+        if (!moved && (!target || target === dragFrom)) {
+          if (partnerOf(dragFrom)) disconnectPlug(dragFrom);
+        } else if (target && target !== dragFrom) {
+          connectPlug(dragFrom, target);
+        }
+        clearPreview();
+        dragFrom = null;
+        controls.enabled = true;
+        return;
+      }
       if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return;
       toNdc(e);
       ray.setFromCamera(ndc, camera);
@@ -933,6 +1044,7 @@
       if (hits.length) press(hits[0].object.userData.ch as string);
     }
     renderer.domElement.addEventListener("pointerdown", onDown);
+    renderer.domElement.addEventListener("pointermove", onMove);
     renderer.domElement.addEventListener("pointerup", onUp);
 
     function resize() {
@@ -958,6 +1070,10 @@
         const s = rotorSpins[r];
         s.rotation.x += (targetRot[r] - s.rotation.x) * 0.18;
       }
+      {
+        const lt = lidOpen ? LID_OPEN : LID_SHUT;
+        lidPivot.rotation.x += (lt - lidPivot.rotation.x) * 0.12;
+      }
       if (active && activeCurve && spark.visible) {
         const dt = ((performance.now() - sparkT0) / 900) % 1;
         spark.position.copy(activeCurve.getPointAt(dt));
@@ -972,7 +1088,9 @@
       ro.disconnect();
       unsubs.forEach((u) => u());
       renderer.domElement.removeEventListener("pointerdown", onDown);
+      renderer.domElement.removeEventListener("pointermove", onMove);
       renderer.domElement.removeEventListener("pointerup", onUp);
+      clearPreview();
       controls.dispose();
       clearCables();
       woodMap.dispose();

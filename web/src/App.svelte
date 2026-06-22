@@ -1,6 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { boot, press, ready, input, output, error, xray } from "./machine";
+  import {
+    boot,
+    press,
+    ready,
+    input,
+    output,
+    error,
+    xray,
+    lid,
+  } from "./machine";
   import Config from "./lib/Config.svelte";
   import Machine3D from "./lib/Machine3D.svelte";
 
@@ -27,6 +36,13 @@
       on:click={() => xray.update((v) => !v)}
     >
       {$xray ? "■ X-ray" : "◉ X-ray"}
+    </button>
+    <button
+      class="xray lid"
+      class:on={$lid}
+      on:click={() => lid.update((v) => !v)}
+    >
+      {$lid ? "▣ 뚜껑" : "▢ 뚜껑"}
     </button>
   </div>
   <div class="io">
@@ -112,5 +128,8 @@
     color: #14110d;
     background: #ffcf4d;
     border-color: #ffcf4d;
+  }
+  .xray.lid {
+    top: 50px;
   }
 </style>
