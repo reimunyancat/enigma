@@ -624,39 +624,70 @@
     }
 
     // ── 뚜껑 + ENIGMA 로고 ──
+    const LID_HINGE_Y = 3.2; // 로터 꼭대기(≈2.7)보다 위
+    const LID_HINGE_Z = -5.15; // 케이스 맨 뒤
+    const LID_W = 13.2;
+    const LID_D = 11.1; // 경첩→플러그보드 앞까지
+    const LID_WALL = 2.0; // 옆/앞벽 높이(윗판→데크)
     const lidPivot = new THREE.Group();
-    lidPivot.position.set(0, 1.95, -4.85);
+    lidPivot.position.set(0, LID_HINGE_Y, LID_HINGE_Z);
     scene.add(lidPivot);
-    const lid = new THREE.Mesh(
-      new RoundedBoxGeometry(12.5, 0.35, 9.0, 4, 0.18),
-      woodMat,
+    const lidWood = woodMat.clone();
+    // 윗판
+    const lidTop = new THREE.Mesh(
+      new RoundedBoxGeometry(LID_W, 0.34, LID_D, 4, 0.16),
+      lidWood,
     );
-    lid.position.set(0, 0, 4.4);
-    lidPivot.add(lid);
+    lidTop.position.set(0, 0, LID_D / 2);
+    lidPivot.add(lidTop);
+    // 앞벽
+    const lidFront = new THREE.Mesh(
+      new RoundedBoxGeometry(LID_W, LID_WALL, 0.34, 3, 0.12),
+      lidWood,
+    );
+    lidFront.position.set(0, -LID_WALL / 2, LID_D);
+    lidPivot.add(lidFront);
+    // 옆벽 2개
+    for (const sx of [-1, 1]) {
+      const side = new THREE.Mesh(
+        new RoundedBoxGeometry(0.34, LID_WALL, LID_D, 3, 0.12),
+        lidWood,
+      );
+      side.position.set(sx * (LID_W / 2 - 0.17), -LID_WALL / 2, LID_D / 2);
+      lidPivot.add(side);
+    }
+    // ENIGMA 로고 (뚜껑 안쪽 — 열었을 때 정면으로 보임)
     const logoMat = new THREE.MeshBasicMaterial({
       map: logoTex(),
       transparent: true,
       depthWrite: false,
     });
     const logo = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.2), logoMat);
-    logo.rotation.x = -Math.PI / 2;
-    logo.position.set(0, 0.2, 4.0);
+    logo.rotation.x = Math.PI / 2;
+    logo.position.set(0, -0.18, LID_D * 0.4);
     lidPivot.add(logo);
-    const LID_OPEN = -1.65;
-    const LID_SHUT = -0.02;
+    const LID_OPEN = -1.9;
+    const LID_SHUT = 0;
     lidPivot.rotation.x = LID_OPEN;
+    // 뒤판(케이스 고정) — 경첩이 붙는 면
+    const backPanel = new THREE.Mesh(
+      new RoundedBoxGeometry(LID_W, LID_WALL, 0.34, 3, 0.12),
+      woodMat.clone(),
+    );
+    backPanel.position.set(0, LID_HINGE_Y - LID_WALL / 2, LID_HINGE_Z);
+    scene.add(backPanel);
     // 경첩 barrels
-    for (const sx of [-3.6, 3.6]) {
+    for (const sx of [-3.8, 3.8]) {
       const barrel = new THREE.Mesh(
         new THREE.CylinderGeometry(0.16, 0.16, 0.9, 20),
         brassMat,
       );
       barrel.rotation.z = Math.PI / 2;
-      barrel.position.set(sx, 1.95, -4.85);
+      barrel.position.set(sx, LID_HINGE_Y, LID_HINGE_Z);
       scene.add(barrel);
     }
 
-    const casing = [body, base, topPanel, housing, trough, pbPanel, lid];
+    const casing = [body, base, topPanel, housing, trough, pbPanel];
     casing.forEach(
       (m) => (m.material = (m.material as THREE.MeshStandardMaterial).clone()),
     );
