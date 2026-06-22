@@ -12,7 +12,7 @@
     press,
     xray,
     lastTrace,
-    lid,
+    lid as lidStore,
     patch,
   } from "../machine";
   import { get } from "svelte/store";
@@ -364,10 +364,17 @@
       }
       return out;
     }
+    function partnerOf(ch: string): string | null {
+      for (const p of plugPairs(get(config).plugs)) {
+        if (p[0] === ch) return p[1];
+        if (p[1] === ch) return p[0];
+      }
+      return null;
+    }
     function connectPlug(a: string, b: string) {
       if (a === b) return;
       const pairs = plugPairs(get(config).plugs).filter(
-        (p) => !p.includes(a) && p.includes(b),
+        (p) => !p.includes(a) && !p.includes(b),
       );
       pairs.push(a + b);
       patch({ plugs: pairs.join("") });
@@ -947,7 +954,7 @@
       }),
       lastTrace.subscribe((t) => buildActive(t)),
       xray.subscribe((on) => setXray(on)),
-      lid.subscribe((v) => {
+      lidStore.subscribe((v) => {
         lidOpen = v;
       }),
     ];
