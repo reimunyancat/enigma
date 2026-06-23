@@ -23,6 +23,7 @@ export const output = writable("");
 export const error = writable("");
 export const xray = writable(false);
 export const lid = writable(true);
+export const rotorLid = writable(true);
 
 let seq = 0;
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

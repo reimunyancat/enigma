@@ -9,6 +9,7 @@
     error,
     xray,
     lid,
+    rotorLid,
   } from "./machine";
   import Config from "./lib/Config.svelte";
   import Machine3D from "./lib/Machine3D.svelte";
@@ -44,6 +45,12 @@
     >
       {$lid ? "▣ 뚜껑" : "▢ 뚜껑"}
     </button>
+    <button
+      class="xray rotor"
+      class:on={$rotorLid}
+      on:click={() => rotorLid.update((v) => !v)}
+      >{$rotorLid ? "▣ 로터" : "▢ 로터"}</button
+    >
   </div>
   <div class="io">
     <div><span class="lbl">입력</span><span class="val">{$input}</span></div>
@@ -131,5 +138,8 @@
   }
   .xray.lid {
     top: 50px;
+  }
+  .xray.rotor {
+    top: 88px;
   }
 </style>

@@ -13,6 +13,7 @@
     xray,
     lastTrace,
     lid as lidStore,
+    rotorLid as rotorLidStore,
     patch,
   } from "../machine";
   import { get } from "svelte/store";
@@ -23,6 +24,7 @@
     reflectorPerm,
   } from "./rotorData";
   import type { Trace } from "../engine";
+  import { ThreeMFLoader } from "three/examples/jsm/Addons.js";
 
   let host: HTMLDivElement;
 
@@ -312,7 +314,29 @@
       });
     });
 
-    // 플러그 케이블 (설정의 plugs 반영)
+    const FLAP_OPEN = Math.PI / 2;
+    const FLAP_SHUT = 0;
+    const flapPivot = new THREE.Group();
+    flapPivot.position.set(0, -1.7, 5.95);
+    flapPivot.position.x = FLAP_OPEN;
+    scene.add(flapPivot);
+    const flap = new THREE.Mesh(
+      new RoundedBoxGeometry(11.6, 2.6, 0.3, 3, 0.1),
+      woodMat.clone(),
+    );
+    flap.position.set(0, 1.3, 0);
+    flapPivot.add(flap);
+    for (const sx of [-4.2, 4.2]) {
+      const hb = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13, 0.13, 0.7, 16),
+        brassMat,
+      );
+      hb.rotation.z = Math.PI / 2;
+      hb.position.set(sx, -1.7, 5.95);
+      scene.add(hb);
+    }
+
+    // 플러그 케이블
     const cableGroup = new THREE.Group();
     scene.add(cableGroup);
     function clearCables() {
@@ -610,6 +634,49 @@
       etwGrp.add(pin);
     }
 
+    const ROTORLID_OPEN = -2.2;
+    const ROTORLID_SHUT = 0;
+    const rotorLidPivot = new THREE.Group();
+    rotorLidPivot.position.set(0, 2.9, -4.85);
+    rotorLidPivot.rotation.x = ROTORLID_OPEN;
+    scene.add(rotorLidPivot);
+    const coverWood = woodMat.clone();
+    const COVER_T = 0.16;
+    const coverTiles: Array<[number, number, number, number]> = [
+      [0, 0.625, 3.1, 0.65],
+      [0, 1.7, 3.1, 0.3],
+      [-1.38, 1.25, 0.34, 0.6],
+      [-0.475, 1.25, 0.43, 0.6],
+      [0.475, 1.25, 0.43, 0.6],
+      [1.38, 1.25, 0.34, 0.6],
+    ];
+    for (const [cx, czl, w, d] of coverTiles) {
+      const tile = new THREE.Mesh(
+        new THREE.BoxGeometry(w, COVER_T, d),
+        coverWood,
+      );
+      tile.position.set(cx, 0, czl);
+      rotorLidPivot.add(tile);
+    }
+    for (const wx of rotorX) {
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.27, 0.025, 8, 20),
+        brassMat,
+      );
+      rim.rotation.x = Math.PI / 2;
+      rim.position.set(wx, 0.09, 1.25);
+      rotorLidPivot.add(rim);
+    }
+    for (const sx of [-1.4, 1.4]) {
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.12, 0.5, 16),
+        brassMat,
+      );
+      barrel.rotation.z = Math.PI / 2;
+      barrel.position.set(sx, 2.9, -4.85);
+      scene.add(barrel);
+    }
+
     function updateRotors(v: string) {
       const p = (v || "").padEnd(3, "A");
       for (let r = 0; r < 3; r++) targetRot[r] = -(C(p[r]) / 26) * Math.PI * 2;
@@ -624,11 +691,11 @@
     }
 
     // ── 뚜껑 + ENIGMA 로고 ──
-    const LID_HINGE_Y = 3.2; // 로터 꼭대기(≈2.7)보다 위
-    const LID_HINGE_Z = -5.15; // 케이스 맨 뒤
+    const LID_HINGE_Y = 3.2;
+    const LID_HINGE_Z = -5.15;
     const LID_W = 13.2;
-    const LID_D = 11.1; // 경첩→플러그보드 앞까지
-    const LID_WALL = 2.0; // 옆/앞벽 높이(윗판→데크)
+    const LID_D = 11.1;
+    const LID_WALL = 2.0;
     const lidPivot = new THREE.Group();
     lidPivot.position.set(0, LID_HINGE_Y, LID_HINGE_Z);
     scene.add(lidPivot);
@@ -666,10 +733,64 @@
     logo.rotation.x = Math.PI / 2;
     logo.position.set(0, -0.18, LID_D * 0.4);
     lidPivot.add(logo);
+
+    const lidInnerY = -0.18;
+    const sbBar = new THREE.Mesh(
+      new RoundedBoxGeometry(5.4, 0.18, 0.7, 2, 0.05),
+      bakeMat.clone(),
+    );
+    sbBar.position.set(0, lidInnerY - 0.09, 8.7);
+    lidPivot.add(sbBar);
+    for (let i = 0; i < 7; i++) {
+      const sx = (i - 3) * 0.78;
+      const socket = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.16, 0.16, 0.16, 16),
+        brassMat,
+      );
+      socket.position.set(sx, lidInnerY - 0.18, 8.7);
+      lidPivot.add(socket);
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 14, 10),
+        new THREE.MeshStandardMaterial({
+          color: 0xeae0c0,
+          roughness: 0.25,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.85,
+        }),
+      );
+      bulb.position.set(sx, lidInnerY - 0.32, 8.7);
+      lidPivot.add(bulb);
+    }
+    [0x35a04a, 0xb8323a].forEach((col, i) => {
+      const f = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.42, 0.06, 24),
+        new THREE.MeshStandardMaterial({
+          color: col,
+          roughness: 0.3,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.55,
+        }),
+      );
+      f.position.set((i - 0.5) * 1.4, lidInnerY - 0.06, 7.3);
+      lidPivot.add(f);
+    });
+    const namePlate = new THREE.Mesh(
+      new RoundedBoxGeometry(3.0, 0.05, 1.1, 2, 0.04),
+      new THREE.MeshStandardMaterial({
+        color: 0x6b6256,
+        roughness: 0.4,
+        metalness: 0.7,
+      }),
+    );
+    namePlate.position.set(0, lidInnerY - 0.03, 6.1);
+    lidPivot.add(namePlate);
+
     const LID_OPEN = -1.9;
     const LID_SHUT = 0;
     lidPivot.rotation.x = LID_OPEN;
-    // 뒤판(케이스 고정) — 경첩이 붙는 면
+    // 뒤판
     const backPanel = new THREE.Mesh(
       new RoundedBoxGeometry(LID_W, LID_WALL, 0.34, 3, 0.12),
       woodMat.clone(),
@@ -971,6 +1092,7 @@
 
     let pressedCh: string | null = null;
     let lidOpen = true;
+    let rotorCoverOpen = true;
     const unsubs = [
       rotorPos.subscribe((p) => {
         (updateRotors(p), rebuildBraid());
@@ -987,6 +1109,9 @@
       xray.subscribe((on) => setXray(on)),
       lidStore.subscribe((v) => {
         lidOpen = v;
+      }),
+      rotorLidStore.subscribe((v) => {
+        rotorCoverOpen = v;
       }),
     ];
 
@@ -1111,6 +1236,10 @@
       {
         const lt = lidOpen ? LID_OPEN : LID_SHUT;
         lidPivot.rotation.x += (lt - lidPivot.rotation.x) * 0.12;
+        const ft = lidOpen ? FLAP_OPEN : FLAP_SHUT;
+        flapPivot.rotation.x += (ft - flapPivot.rotation.x) * 0.12;
+        const ct = rotorCoverOpen ? ROTORLID_OPEN : ROTORLID_SHUT;
+        rotorLidPivot.rotation.x += (ct - rotorLidPivot.rotation.x) * 0.12;
       }
       if (active && activeCurve && spark.visible) {
         const dt = ((performance.now() - sparkT0) / 900) % 1;
