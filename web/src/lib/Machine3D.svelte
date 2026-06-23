@@ -318,7 +318,7 @@
     const FLAP_SHUT = 0;
     const flapPivot = new THREE.Group();
     flapPivot.position.set(0, -1.7, 5.95);
-    flapPivot.position.x = FLAP_OPEN;
+    flapPivot.rotation.x = FLAP_OPEN;
     scene.add(flapPivot);
     const flap = new THREE.Mesh(
       new RoundedBoxGeometry(11.6, 2.6, 0.3, 3, 0.1),
@@ -357,13 +357,13 @@
         seen.add(s[i]);
         seen.add(s[i + 1]);
         const mid = a.clone().add(b).multiplyScalar(0.5);
-        mid.z += 1.6;
-        mid.y -= 0.7;
+        mid.z += 0.45;
+        mid.y -= 1.1;
         const curve = new THREE.CatmullRomCurve3([
           a,
-          a.clone().add(new THREE.Vector3(0, -0.15, 0.7)),
+          a.clone().add(new THREE.Vector3(0, -0.35, 0.3)),
           mid,
-          b.clone().add(new THREE.Vector3(0, -0.15, 0.7)),
+          b.clone().add(new THREE.Vector3(0, -0.35, 0.3)),
           b,
         ]);
         const tube = new THREE.Mesh(
@@ -634,21 +634,24 @@
       etwGrp.add(pin);
     }
 
-    const ROTORLID_OPEN = -2.2;
+    const ROTORLID_OPEN = -2.0;
     const ROTORLID_SHUT = 0;
+    const ROTORLID_PIVOT_Y = 2.88;
+    const ROTORLID_PIVOT_Z = -4.6;
     const rotorLidPivot = new THREE.Group();
-    rotorLidPivot.position.set(0, 2.9, -4.85);
-    rotorLidPivot.rotation.x = ROTORLID_OPEN;
+    rotorLidPivot.position.set(0, ROTORLID_PIVOT_Y, ROTORLID_PIVOT_Z);
+    rotorLidPivot.rotation.x = ROTORLID_SHUT;
     scene.add(rotorLidPivot);
     const coverWood = woodMat.clone();
     const COVER_T = 0.16;
+    // 로터 중심 local z = rotorZ - pivotZ = 1.0. 그 위에 창 3개를 남기고 막는다.
     const coverTiles: Array<[number, number, number, number]> = [
-      [0, 0.625, 3.1, 0.65],
-      [0, 1.7, 3.1, 0.3],
-      [-1.38, 1.25, 0.34, 0.6],
-      [-0.475, 1.25, 0.43, 0.6],
-      [0.475, 1.25, 0.43, 0.6],
-      [1.38, 1.25, 0.34, 0.6],
+      [0, 0.35, 4.2, 0.7], // 경첩 쪽 가로 막대 (z=0에서 시작)
+      [0, 1.525, 4.2, 0.45], // 앞쪽 가로 막대
+      [-1.65, 1.0, 0.9, 0.6], // 좌측
+      [-0.475, 1.0, 0.45, 0.6], // L–M 사이
+      [0.475, 1.0, 0.45, 0.6], // M–R 사이
+      [1.65, 1.0, 0.9, 0.6], // 우측
     ];
     for (const [cx, czl, w, d] of coverTiles) {
       const tile = new THREE.Mesh(
@@ -664,7 +667,7 @@
         brassMat,
       );
       rim.rotation.x = Math.PI / 2;
-      rim.position.set(wx, 0.09, 1.25);
+      rim.position.set(wx, 0.09, 1.0);
       rotorLidPivot.add(rim);
     }
     for (const sx of [-1.4, 1.4]) {
@@ -673,7 +676,7 @@
         brassMat,
       );
       barrel.rotation.z = Math.PI / 2;
-      barrel.position.set(sx, 2.9, -4.85);
+      barrel.position.set(sx, ROTORLID_PIVOT_Y, ROTORLID_PIVOT_Z);
       scene.add(barrel);
     }
 
@@ -693,9 +696,9 @@
     // ── 뚜껑 + ENIGMA 로고 ──
     const LID_HINGE_Y = 3.2;
     const LID_HINGE_Z = -5.15;
-    const LID_W = 13.2;
-    const LID_D = 11.1;
-    const LID_WALL = 2.0;
+    const LID_W = 12.9;
+    const LID_D = 10.8;
+    const LID_WALL = 2.2;
     const lidPivot = new THREE.Group();
     lidPivot.position.set(0, LID_HINGE_Y, LID_HINGE_Z);
     scene.add(lidPivot);
@@ -1238,7 +1241,7 @@
         lidPivot.rotation.x += (lt - lidPivot.rotation.x) * 0.12;
         const ft = lidOpen ? FLAP_OPEN : FLAP_SHUT;
         flapPivot.rotation.x += (ft - flapPivot.rotation.x) * 0.12;
-        const ct = rotorCoverOpen ? ROTORLID_OPEN : ROTORLID_SHUT;
+        const ct = rotorCoverOpen && lidOpen ? ROTORLID_OPEN : ROTORLID_SHUT;
         rotorLidPivot.rotation.x += (ct - rotorLidPivot.rotation.x) * 0.12;
       }
       if (active && activeCurve && spark.visible) {
