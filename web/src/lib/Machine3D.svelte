@@ -357,15 +357,12 @@
         seen.add(s[i]);
         seen.add(s[i + 1]);
         const mid = a.clone().add(b).multiplyScalar(0.5);
-        mid.z += 0.45;
-        mid.y -= 1.1;
-        const curve = new THREE.CatmullRomCurve3([
-          a,
-          a.clone().add(new THREE.Vector3(0, -0.35, 0.3)),
-          mid,
-          b.clone().add(new THREE.Vector3(0, -0.35, 0.3)),
-          b,
-        ]);
+        const sag = Math.min(0.25 + a.distanceTo(b) * 0.1, 0.6);
+        mid.z = PB_Z + 0.2;
+        mid.y = Math.max(Math.min(a.y, b.y) - sag, -1.6);
+        const ca = a.clone().add(new THREE.Vector3(0, -0.08, 0.12));
+        const cb = b.clone().add(new THREE.Vector3(0, -0.08, 0.12));
+        const curve = new THREE.CatmullRomCurve3([a, ca, mid, cb, b]);
         const tube = new THREE.Mesh(
           new THREE.TubeGeometry(curve, 46, 0.055, 8, false),
           cableMat,
