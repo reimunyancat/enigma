@@ -1,15 +1,15 @@
 # Enigma
 
-브라우저에서 돌아가는 3D 인터랙티브 에니그마 암호기 시뮬레이터. C++로 짠 암호 엔진 한 벌을 CLI와 웹(WebAssembly)이 함께 공유한다.
+A 3D interactive Enigma cipher machine simulator that runs in the browser. A single C++ cipher engine is shared by both the CLI and the web (WebAssembly) front end.
 
-## 구성
+## Structure
 
-- `enigma.hpp` — 암호 엔진(로터·리플렉터·플러그보드). CLI와 WASM이 공유하는 단일 소스.
-- `main.cpp` — CLI 진입점.
-- `wasm.cpp` — Emscripten으로 엔진을 브라우저에 노출(`enigma_init` / `enigma_press` / `enigma_positions` / `enigma_trace`).
-- `web/` — Vite + Svelte + TypeScript + Three.js 프론트엔드. 3D 기체, X-ray 배선 뷰, 드래그식 플러그보드, 합성 사운드.
+- `enigma.hpp` — the cipher engine (rotors, reflector, plugboard). Single source of truth shared by the CLI and WASM.
+- `main.cpp` — CLI entry point.
+- `wasm.cpp` — exposes the engine to the browser via Emscripten (`enigma_init` / `enigma_press` / `enigma_positions` / `enigma_trace`).
+- `web/` — Vite + Svelte + TypeScript + Three.js front end: 3D machine, X-ray wiring view, drag-and-drop plugboard, synthesized sound.
 
-## 실행
+## Running
 
 ### CLI
 
@@ -18,20 +18,20 @@ g++ -std=c++17 -O2 main.cpp -o enigma
 ./enigma
 ```
 
-### 웹 (3D 데모)
+### Web (3D demo)
 
 ```sh
 cd web
 npm install
-npm run dev      # 개발 서버
-npm run build    # 정적 빌드
+npm run dev      # dev server
+npm run build    # static build
 ```
 
-WASM 모듈(`web/src/enigma.mjs`)은 이미 빌드돼 포함돼 있으므로, 웹을 실행만 할 때는 Emscripten이 필요 없다. 엔진을 고쳐 다시 빌드할 때만 Emscripten으로 `wasm.cpp`를 컴파일하면 된다.
+The WASM module (`web/src/enigma.mjs`) is prebuilt and committed, so Emscripten is not required just to run the web app. You only need Emscripten to recompile `wasm.cpp` after changing the engine.
 
-## 검증
+## Verification
 
-표준 테스트 벡터로 엔진 동작을 확인할 수 있다.
+You can check the engine against a standard test vector:
 
-- 로터 I·II·III / 리플렉터 B / 링 `TOU` / 위치 `HOU` / 플러그 `ABCDXZ`
-- 입력 `TOUHOU` → 출력 `MQGGFI`, 로터 종료 위치 `HPA`
+- Rotors I·II·III / Reflector B / Rings `TOU` / Positions `HOU` / Plugs `ABCDXZ`
+- Input `TOUHOU` → output `MQGGFI`, final rotor positions `HPA`
