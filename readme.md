@@ -1,6 +1,7 @@
 # Enigma
 
 A 3D interactive Enigma cipher machine simulator that runs in the browser. A single C++ cipher engine is shared by both the CLI and the web (WebAssembly) front end.
+https://reimunyancat.github.io/enigma/
 
 ## Structure
 
