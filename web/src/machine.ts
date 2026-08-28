@@ -1,6 +1,7 @@
 import { writable, get } from "svelte/store";
 import * as engine from "./engine";
 import * as sound from "./sound";
+import { msg } from "./i18n";
 import type { EnigmaConfig, Trace } from "./engine";
 
 export const defaultConfig: EnigmaConfig = {
@@ -24,6 +25,28 @@ export const error = writable("");
 export const xray = writable(false);
 export const lid = writable(true);
 export const rotorLid = writable(true);
+export const rotLock = writable(false);
+export const viewPreset = writable<{ name: string } | null>(null);
+export const group5 = writable(false);
+export const guideOpen = writable(true);
+export const crackOpen = writable(false);
+
+export type Quality = "auto" | "high" | "low";
+
+function loadQuality(): Quality {
+  try {
+    const s = localStorage.getItem("enigma-quality");
+    if (s === "auto" || s === "high" || s === "low") return s;
+  } catch {}
+  return "auto";
+}
+
+export const quality = writable<Quality>(loadQuality());
+quality.subscribe((v) => {
+  try {
+    localStorage.setItem("enigma-quality", v);
+  } catch {}
+});
 
 let seq = 0;
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -34,13 +57,12 @@ export async function boot(): Promise<void> {
   ready.set(true);
 }
 
-// 설정을 엔진에 반영하고 입·출력·램프를 초기화한다.
 export function apply(): boolean {
   const cfg = get(config);
   const plugs = cfg.plugs.toUpperCase().replace(/[^A-Z]/g, "");
   const ok = engine.configure({ ...cfg, plugs });
   if (!ok) {
-    error.set("설정 오류 — 로터·플러그 값을 확인해 주세요");
+    error.set(msg("errorConfig"));
     return false;
   }
   error.set("");
@@ -55,6 +77,11 @@ export function apply(): boolean {
 export function patch(part: Partial<EnigmaConfig>): void {
   config.update((c) => ({ ...c, ...part }));
   apply();
+}
+
+export function clearText(): void {
+  input.set("");
+  output.set("");
 }
 
 export async function press(ch: string): Promise<void> {

@@ -4,6 +4,7 @@
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
   import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
   import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+  import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
   import {
     rotorPos,
     lamp,
@@ -14,6 +15,9 @@
     lastTrace,
     lid as lidStore,
     rotorLid as rotorLidStore,
+    rotLock,
+    viewPreset,
+    quality,
     patch,
   } from "../machine";
   import { get } from "svelte/store";
@@ -24,7 +28,6 @@
     reflectorPerm,
   } from "./rotorData";
   import type { Trace } from "../engine";
-  import { ThreeMFLoader } from "three/examples/jsm/Addons.js";
 
   let host: HTMLDivElement;
 
@@ -49,7 +52,49 @@
     controls.maxDistance = 34;
     controls.maxPolarAngle = Math.PI * 0.495;
 
-    // IBL — 금속/나무 반사
+    let needsRender = true;
+    const invalidate = () => {
+      needsRender = true;
+    };
+    controls.addEventListener("change", invalidate);
+
+    const PR_STEPS = [Math.min(window.devicePixelRatio, 2), 1.5, 1.25, 1];
+    let prStep = 0;
+    function applyQuality(q: string) {
+      if (q === "low") prStep = PR_STEPS.length - 1;
+      else if (q === "high") prStep = 0;
+      else prStep = PR_STEPS[0] > 1.5 ? 1 : 0;
+      renderer.setPixelRatio(PR_STEPS[prStep]);
+      resize();
+      invalidate();
+    }
+    let fpsFrames = 0;
+    let fpsT0 = performance.now();
+    function fpsSample() {
+      fpsFrames++;
+      if (fpsFrames < 90) return;
+      const now = performance.now();
+      const fps = fpsFrames / ((now - fpsT0) / 1000);
+      fpsFrames = 0;
+      fpsT0 = now;
+      if (get(quality) === "auto" && fps < 45 && prStep < PR_STEPS.length - 1) {
+        prStep++;
+        renderer.setPixelRatio(PR_STEPS[prStep]);
+        resize();
+      }
+    }
+
+    const VIEWS: Record<
+      string,
+      { pos: [number, number, number]; tgt: [number, number, number] }
+    > = {
+      overview: { pos: [0.5, 9.2, 11.9], tgt: [0, 0.7, 0.4] },
+      keys: { pos: [0, 6.6, 12.8], tgt: [0, 1.0, 3.2] },
+      plugboard: { pos: [0, 0.6, 15.2], tgt: [0, -0.4, 5.6] },
+      rotors: { pos: [0, 6.4, 4.6], tgt: [0, 1.9, -3.6] },
+    };
+    let camTween: { pos: THREE.Vector3; tgt: THREE.Vector3 } | null = null;
+
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = envTex;
@@ -66,17 +111,17 @@
     const ROWS = ["QWERTZUIO", "ASDFGHJK", "PYXCVBNML"];
     const DX = 1.12;
 
-    // ── 절차적 나무결 ──
-    function woodTexture(): THREE.CanvasTexture {
-      const w = 512,
-        h = 512;
+    function woodTexture(size: number): THREE.CanvasTexture {
+      const w = size,
+        h = size;
       const cv = document.createElement("canvas");
       cv.width = w;
       cv.height = h;
       const g = cv.getContext("2d")!;
       g.fillStyle = "#5b3d22";
       g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 2600; i++) {
+      const strokes = size * 5;
+      for (let i = 0; i < strokes; i++) {
         const y = Math.random() * h;
         const s = 18 + Math.random() * 50;
         g.strokeStyle = `rgba(${20 + s},${12 + s * 0.55},${6 + s * 0.3},${0.05 + Math.random() * 0.08})`;
@@ -99,7 +144,7 @@
       t.anisotropy = 8;
       return t;
     }
-    const woodMap = woodTexture();
+    const woodMap = woodTexture(get(quality) === "low" ? 512 : 1024);
 
     function letterTex(ch: string, color: string): THREE.CanvasTexture {
       const s = 128;
@@ -117,7 +162,6 @@
       t.anisotropy = 8;
       return t;
     }
-    // 위를 보는(바닥에 눕는) 라벨
     function flatLabel(
       ch: string,
       color: string,
@@ -134,7 +178,6 @@
       mesh.rotation.x = -Math.PI / 2;
       return mesh;
     }
-    // 앞면(+Z)을 보는 라벨
     function faceLabel(ch: string, color: string, size: number): THREE.Mesh {
       const m = new THREE.MeshBasicMaterial({
         map: letterTex(ch, color),
@@ -144,23 +187,27 @@
       return new THREE.Mesh(new THREE.PlaneGeometry(size, size), m);
     }
 
-    // ENIGMA 로고판
     function logoTex(): THREE.CanvasTexture {
       const cv = document.createElement("canvas");
       cv.width = 512;
       cv.height = 256;
       const g = cv.getContext("2d")!;
-      g.fillStyle = "#0d0b09";
-      g.fillRect(0, 0, 512, 256);
-      g.strokeStyle = "#c9a24b";
+      g.clearRect(0, 0, 512, 256);
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.font = "bold 96px Georgia, serif";
       g.lineWidth = 7;
+      g.strokeStyle = "rgba(238,228,205,0.3)";
+      g.beginPath();
+      g.ellipse(256, 132, 208, 78, 0, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = "rgba(238,228,205,0.32)";
+      g.fillText("Enigma", 256, 142);
+      g.strokeStyle = "rgba(26,13,5,0.9)";
       g.beginPath();
       g.ellipse(256, 128, 208, 78, 0, 0, Math.PI * 2);
       g.stroke();
-      g.fillStyle = "#ece4d0";
-      g.font = "bold 96px Georgia, serif";
-      g.textAlign = "center";
-      g.textBaseline = "middle";
+      g.fillStyle = "rgba(26,13,5,0.92)";
       g.fillText("Enigma", 256, 138);
       const t = new THREE.CanvasTexture(cv);
       t.colorSpace = THREE.SRGBColorSpace;
@@ -168,7 +215,6 @@
       return t;
     }
 
-    // ── 재질 ──
     const woodMat = new THREE.MeshStandardMaterial({
       map: woodMap,
       color: 0xd6b083,
@@ -225,7 +271,6 @@
 
     const TOP = 1.1;
 
-    // ── 케이스 ──
     const body = new THREE.Mesh(
       new RoundedBoxGeometry(12.5, 3.2, 10.6, 5, 0.3),
       woodMat,
@@ -239,7 +284,6 @@
     base.position.set(0, -2.45, 0.2);
     scene.add(base);
 
-    // 키보드+램프보드용 검은 패널
     const topPanel = new THREE.Mesh(
       new RoundedBoxGeometry(11.4, 0.14, 7.4, 3, 0.08),
       panelMat,
@@ -247,7 +291,6 @@
     topPanel.position.set(0, TOP + 0.02, 1.5);
     scene.add(topPanel);
 
-    // 뒤쪽 로터 하우징 (살짝 솟음, 얕게)
     const housing = new THREE.Mesh(
       new RoundedBoxGeometry(12.5, 1.7, 3.0, 4, 0.18),
       woodMat,
@@ -261,7 +304,6 @@
     trough.position.set(-0.1, 1.4, -3.6);
     scene.add(trough);
 
-    // 모서리 브라스 리벳
     const rivetGeo = new THREE.SphereGeometry(0.12, 16, 16);
     for (const sx of [-1, 1])
       for (const sz of [-1, 1]) {
@@ -270,7 +312,6 @@
         scene.add(rv);
       }
 
-    // ── 앞면 플러그보드 ──
     const pbPanel = new THREE.Mesh(
       new RoundedBoxGeometry(11.0, 2.6, 0.25, 3, 0.08),
       bakeMat,
@@ -282,6 +323,7 @@
     const PB_DX = 1.06;
     const socketPos: Record<string, THREE.Vector3> = {};
     const socketHits: THREE.Mesh[] = [];
+    const socketRings: Record<string, THREE.Mesh> = {};
     const socketPlateGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.12, 24);
     const socketRingGeo = new THREE.TorusGeometry(0.24, 0.035, 10, 24);
     const holeGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.18, 12);
@@ -296,11 +338,12 @@
         plate.userData.ch = ch;
         scene.add(plate);
         socketHits.push(plate);
-        const ring = new THREE.Mesh(socketRingGeo, brassMat);
+        const ring = new THREE.Mesh(socketRingGeo, brassMat.clone());
         ring.position.set(x, y, PB_Z + 0.04);
         ring.userData.ch = ch;
         scene.add(ring);
         socketHits.push(ring);
+        socketRings[ch] = ring;
         for (const dy of [0.1, -0.1]) {
           const hole = new THREE.Mesh(holeGeo, darkMat);
           hole.rotation.x = Math.PI / 2;
@@ -336,7 +379,6 @@
       scene.add(hb);
     }
 
-    // 플러그 케이블
     const cableGroup = new THREE.Group();
     scene.add(cableGroup);
     function clearCables() {
@@ -405,7 +447,18 @@
       patch({ plugs: pairs.join("") });
     }
 
-    // ── 키보드 ──
+    function highlightSockets(from: string | null, over: string | null) {
+      for (const ch in socketRings) {
+        const m = socketRings[ch].material as THREE.MeshStandardMaterial;
+        const avail = from !== null && ch !== from && !partnerOf(ch);
+        m.emissive.setHex(
+          avail ? (ch === over ? 0xffcf4d : 0x5fc6ff) : 0x000000,
+        );
+        m.emissiveIntensity = avail ? (ch === over ? 1.6 : 0.6) : 0;
+      }
+      invalidate();
+    }
+
     const KEYZ = [4.4, 3.3, 2.2];
     const capGeo = new THREE.CylinderGeometry(0.33, 0.39, 0.32, 32);
     const keyRingGeo = new THREE.TorusGeometry(0.4, 0.05, 10, 28);
@@ -435,7 +488,6 @@
       });
     });
 
-    // ── 램프보드 ──
     const LAMPZ = [0.9, -0.2, -1.3];
     const lampMats: Record<string, THREE.MeshStandardMaterial> = {};
     const lampLabels: Record<string, THREE.MeshBasicMaterial> = {};
@@ -476,7 +528,6 @@
       });
     });
 
-    // ── 로터  ──
     const rotorX = [-0.95, 0, 0.95];
     const rotorY = 1.82;
     const rotorZ = -3.6;
@@ -558,7 +609,6 @@
         scene.add(b);
       }
     }
-    // ── 리플렉터 ──
     const reflGrp = new THREE.Group();
     reflGrp.position.set(-1.78, rotorY, rotorZ);
     scene.add(reflGrp);
@@ -591,7 +641,6 @@
       pin.position.set(0.24, Math.cos(a) * 0.45, Math.sin(a) * 0.45);
       reflGrp.add(pin);
     }
-    // ── 엔트리 휠 ──
     const etwMat = new THREE.MeshStandardMaterial({
       color: 0x161208,
       roughness: 0.5,
@@ -641,14 +690,13 @@
     scene.add(rotorLidPivot);
     const coverWood = woodMat.clone();
     const COVER_T = 0.16;
-    // 로터 중심 local z = rotorZ - pivotZ = 1.0. 그 위에 창 3개를 남기고 막는다.
     const coverTiles: Array<[number, number, number, number]> = [
-      [0, 0.35, 4.2, 0.7], // 경첩 쪽 가로 막대 (z=0에서 시작)
-      [0, 1.525, 4.2, 0.45], // 앞쪽 가로 막대
-      [-1.65, 1.0, 0.9, 0.6], // 좌측
-      [-0.475, 1.0, 0.45, 0.6], // L–M 사이
-      [0.475, 1.0, 0.45, 0.6], // M–R 사이
-      [1.65, 1.0, 0.9, 0.6], // 우측
+      [0, 0.35, 4.2, 0.7],
+      [0, 1.525, 4.2, 0.45],
+      [-1.65, 1.0, 0.9, 0.6],
+      [-0.475, 1.0, 0.45, 0.6],
+      [0.475, 1.0, 0.45, 0.6],
+      [1.65, 1.0, 0.9, 0.6],
     ];
     for (const [cx, czl, w, d] of coverTiles) {
       const tile = new THREE.Mesh(
@@ -690,7 +738,6 @@
       }
     }
 
-    // ── 뚜껑 + ENIGMA 로고 ──
     const LID_HINGE_Y = 3.2;
     const LID_HINGE_Z = -5.15;
     const LID_W = 12.9;
@@ -700,21 +747,18 @@
     lidPivot.position.set(0, LID_HINGE_Y, LID_HINGE_Z);
     scene.add(lidPivot);
     const lidWood = woodMat.clone();
-    // 윗판
     const lidTop = new THREE.Mesh(
       new RoundedBoxGeometry(LID_W, 0.34, LID_D, 4, 0.16),
       lidWood,
     );
     lidTop.position.set(0, 0, LID_D / 2);
     lidPivot.add(lidTop);
-    // 앞벽
     const lidFront = new THREE.Mesh(
       new RoundedBoxGeometry(LID_W, LID_WALL, 0.34, 3, 0.12),
       lidWood,
     );
     lidFront.position.set(0, -LID_WALL / 2, LID_D);
     lidPivot.add(lidFront);
-    // 옆벽 2개
     for (const sx of [-1, 1]) {
       const side = new THREE.Mesh(
         new RoundedBoxGeometry(0.34, LID_WALL, LID_D, 3, 0.12),
@@ -723,7 +767,6 @@
       side.position.set(sx * (LID_W / 2 - 0.17), -LID_WALL / 2, LID_D / 2);
       lidPivot.add(side);
     }
-    // ENIGMA 로고 (뚜껑 안쪽 — 열었을 때 정면으로 보임)
     const logoMat = new THREE.MeshBasicMaterial({
       map: logoTex(),
       transparent: true,
@@ -790,14 +833,12 @@
     const LID_OPEN = -1.9;
     const LID_SHUT = 0;
     lidPivot.rotation.x = LID_OPEN;
-    // 뒤판
     const backPanel = new THREE.Mesh(
       new RoundedBoxGeometry(LID_W, LID_WALL, 0.34, 3, 0.12),
       woodMat.clone(),
     );
     backPanel.position.set(0, LID_HINGE_Y - LID_WALL / 2, LID_HINGE_Z);
     scene.add(backPanel);
-    // 경첩 barrels
     for (const sx of [-3.8, 3.8]) {
       const barrel = new THREE.Mesh(
         new THREE.CylinderGeometry(0.16, 0.16, 0.9, 20),
@@ -840,14 +881,6 @@
     };
 
     function buildInternals() {
-      const loomMat = new THREE.MeshStandardMaterial({
-        color: 0xff8a3c,
-        emissive: 0xff6a1e,
-        emissiveIntensity: 1.1,
-        roughness: 0.5,
-        metalness: 0.1,
-      });
-
       const tray = new THREE.Mesh(
         new THREE.BoxGeometry(10.8, 0.12, 8.6),
         new THREE.MeshStandardMaterial({
@@ -877,53 +910,22 @@
         term.position.set(3.3 + sx, -0.22, 2.4);
         wiring.add(term);
       }
-
-      const loom = (
-        a: THREE.Vector3,
-        b: THREE.Vector3,
-        c: THREE.Vector3,
-        d: THREE.Vector3,
-        rad: number,
-      ) => {
-        const curve = new THREE.CatmullRomCurve3([a, b, c, d]);
-        wiring.add(
-          new THREE.Mesh(
-            new THREE.TubeGeometry(curve, 50, rad, 8, false),
-            loomMat,
-          ),
-        );
-      };
-
-      for (const sx of [-3.6, -2.2, -0.8, 0.8, 2.2, 3.6]) {
-        loom(
-          new THREE.Vector3(sx, 0.95, -1.0),
-          new THREE.Vector3(sx * 0.7, -1.35, 0.6),
-          new THREE.Vector3(sx * 0.45, -1.0, -2.2),
-          new THREE.Vector3(
-            THREE.MathUtils.clamp(sx * 0.4, -1.9, 1.9),
-            rotorY - 0.25,
-            rotorZ - 0.1,
-          ),
-          0.085,
-        );
-      }
-      for (const sx of [-0.7, 0, 0.7]) {
-        loom(
-          new THREE.Vector3(sx, -0.6, 5.2),
-          new THREE.Vector3(sx * 0.6, -1.35, 2.5),
-          new THREE.Vector3(sx * 0.4, -0.7, -0.8),
-          new THREE.Vector3(CX.etw + sx * 0.3, rotorY - 0.3, rotorZ + 0.2),
-          0.07,
-        );
-      }
     }
 
-    let braid: THREE.LineSegments | null = null;
+    let xrayOn = false;
+    let braid: THREE.Mesh | null = null;
+    let braidDirty = true;
 
     function rebuildBraid() {
+      if (!xrayOn) {
+        braidDirty = true;
+        return;
+      }
+      braidDirty = false;
       if (braid) {
         wiring.remove(braid);
         braid.geometry.dispose();
+        (braid.material as THREE.Material).dispose();
       }
       const c = get(config);
       const pos = get(rotorPos);
@@ -942,27 +944,58 @@
         pos[0],
         c.rings[0],
       );
-      const pts: THREE.Vector3[] = [];
-      const seg = (a: THREE.Vector3, b: THREE.Vector3) => pts.push(a, b);
+      const tubes: THREE.TubeGeometry[] = [];
+      const wire = (a: THREE.Vector3, b: THREE.Vector3, sag = 0) => {
+        let pts = [a, b];
+        if (sag > 0) {
+          const mid = a.clone().add(b).multiplyScalar(0.5);
+          mid.y = Math.max(mid.y - sag, -1.9);
+          pts = [a, mid, b];
+        }
+        tubes.push(
+          new THREE.TubeGeometry(
+            new THREE.CatmullRomCurve3(pts),
+            sag > 0 ? 20 : 1,
+            0.045,
+            6,
+            false,
+          ),
+        );
+      };
       for (let i = 0; i < 26; i++) {
+        const ch = String.fromCharCode(65 + i);
+        const keyPt = keyGroups[ch].position.clone().setY(TOP + 0.05);
+        const lampPt = lampPos[ch].clone().setY(TOP + 0.02);
+        const sockPt = socketPos[ch]
+          .clone()
+          .add(new THREE.Vector3(0, 0, -0.12));
+        wire(keyPt, sockPt, 0.3);
+        wire(lampPt, sockPt, 0.25);
+        wire(sockPt, contact(CX.etw + 0.2, i), 0.7);
+        wire(contact(CX.etw + 0.2, i), contact(CX.etw - 0.2, i));
         const r = pR[i];
         const m = pM[r];
         const l = pL[m];
-        seg(contact(CX.etw - 0.2, i), contact(CX.R + FACE, i));
-        seg(contact(CX.R + FACE, i), contact(CX.R - FACE, r));
-        seg(contact(CX.R - FACE, r), contact(CX.M + FACE, r));
-        seg(contact(CX.M + FACE, r), contact(CX.M - FACE, m));
-        seg(contact(CX.M - FACE, m), contact(CX.L + FACE, m));
-        seg(contact(CX.L + FACE, m), contact(CX.L - FACE, l));
-        seg(contact(CX.L - FACE, l), contact(CX.refl + 0.21, l));
+        wire(contact(CX.etw - 0.2, i), contact(CX.R + FACE, i));
+        wire(contact(CX.R + FACE, i), contact(CX.R - FACE, r));
+        wire(contact(CX.R - FACE, r), contact(CX.M + FACE, r));
+        wire(contact(CX.M + FACE, r), contact(CX.M - FACE, m));
+        wire(contact(CX.M - FACE, m), contact(CX.L + FACE, m));
+        wire(contact(CX.L + FACE, m), contact(CX.L - FACE, l));
+        wire(contact(CX.L - FACE, l), contact(CX.refl + 0.21, l));
       }
-      const g = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({
-        color: 0xffd479,
-        transparent: true,
-        opacity: 0.6,
-      });
-      braid = new THREE.LineSegments(g, mat);
+      const geo = mergeGeometries(tubes, false);
+      tubes.forEach((t) => t.dispose());
+      braid = new THREE.Mesh(
+        geo,
+        new THREE.MeshStandardMaterial({
+          color: 0xc08a3e,
+          roughness: 0.5,
+          metalness: 0.55,
+          emissive: 0x3a2408,
+          emissiveIntensity: 0.55,
+        }),
+      );
       wiring.add(braid);
     }
 
@@ -993,21 +1026,30 @@
         return;
       }
       const p = tr.path;
+      const letterAt = (i: number) => String.fromCharCode(65 + i);
+      const sock = (i: number) =>
+        socketPos[letterAt(i)].clone().add(new THREE.Vector3(0, 0, 0.06));
+      const cableMid = (a: number, b: number) => {
+        const pa = socketPos[letterAt(a)];
+        const pb = socketPos[letterAt(b)];
+        const mid = pa.clone().add(pb).multiplyScalar(0.5);
+        const sag = Math.min(0.25 + pa.distanceTo(pb) * 0.1, 0.6);
+        mid.z = PB_Z + 0.2;
+        mid.y = Math.max(Math.min(pa.y, pb.y) - sag, -1.6);
+        return mid;
+      };
       const inCh = get(lastKey);
       const keyGrp = inCh ? keyGroups[inCh] : null;
       const v: THREE.Vector3[] = [];
       if (keyGrp) {
         v.push(keyGrp.position.clone().setY(TOP + 0.12));
-        v.push(
-          new THREE.Vector3(
-            keyGrp.position.x * 0.6,
-            rotorY - 1.4,
-            (keyGrp.position.z + rotorZ) / 2,
-          ),
-        );
+        v.push(keyGrp.position.clone().setY(TOP - 0.4));
       }
+      v.push(sock(p[0]));
+      if (p[0] !== p[1]) v.push(cableMid(p[0], p[1]), sock(p[1]));
       v.push(
         contact(CX.etw + 0.2, p[1]),
+        contact(CX.etw - 0.2, p[1]),
         contact(CX.R + FACE, p[1]),
         contact(CX.R - FACE, p[2]),
         contact(CX.M + FACE, p[2]),
@@ -1023,21 +1065,17 @@
         contact(CX.R - FACE, p[7]),
         contact(CX.R + FACE, p[8]),
         contact(CX.etw - 0.2, p[8]),
-        contact(CX.etw + 0.2, p[9]),
+        contact(CX.etw + 0.2, p[8]),
       );
+      v.push(sock(p[8]));
+      if (p[8] !== p[9]) v.push(cableMid(p[8], p[9]), sock(p[9]));
       const outLamp = lampPos[tr.output];
       if (outLamp) {
-        v.push(
-          new THREE.Vector3(
-            outLamp.x * 0.6,
-            rotorY - 1.4,
-            (outLamp.z + rotorZ) / 2,
-          ),
-        );
+        v.push(outLamp.clone().add(new THREE.Vector3(0, 0, 0.12)));
         v.push(outLamp.clone());
       }
       activeCurve = new THREE.CatmullRomCurve3(v);
-      const tube = new THREE.TubeGeometry(activeCurve, 220, 0.045, 8, false);
+      const tube = new THREE.TubeGeometry(activeCurve, 220, 0.055, 8, false);
       active = new THREE.Mesh(
         tube,
         new THREE.MeshStandardMaterial({
@@ -1072,6 +1110,7 @@
     innerLight.position.set(0, 0.2, -1.4);
     scene.add(innerLight);
     function setXray(on: boolean) {
+      xrayOn = on;
       xrayShells.forEach((m) => {
         const mat = m.material as THREE.MeshStandardMaterial;
         mat.transparent = on;
@@ -1083,11 +1122,10 @@
       });
       innerLight.intensity = on ? 26 : 0;
       wiring.visible = on;
+      if (on && braidDirty) rebuildBraid();
     }
 
     buildInternals();
-    rebuildBraid();
-
     rebuildBraid();
 
     let pressedCh: string | null = null;
@@ -1095,27 +1133,56 @@
     let rotorCoverOpen = true;
     const unsubs = [
       rotorPos.subscribe((p) => {
-        (updateRotors(p), rebuildBraid());
+        updateRotors(p);
+        rebuildBraid();
+        invalidate();
       }),
-      lamp.subscribe(setLamp),
+      lamp.subscribe((v) => {
+        setLamp(v);
+        invalidate();
+      }),
       lastKey.subscribe((v) => {
         pressedCh = v;
+        invalidate();
       }),
       config.subscribe((c) => {
         buildCables(c?.plugs ?? "");
         rebuildBraid();
+        invalidate();
       }),
-      lastTrace.subscribe((t) => buildActive(t)),
-      xray.subscribe((on) => setXray(on)),
+      lastTrace.subscribe((t) => {
+        buildActive(t);
+        invalidate();
+      }),
+      xray.subscribe((on) => {
+        setXray(on);
+        invalidate();
+      }),
       lidStore.subscribe((v) => {
         lidOpen = v;
+        invalidate();
       }),
       rotorLidStore.subscribe((v) => {
         rotorCoverOpen = v;
+        invalidate();
       }),
+      rotLock.subscribe((v) => {
+        controls.enableRotate = !v;
+        invalidate();
+      }),
+      viewPreset.subscribe((v) => {
+        if (!v) return;
+        const preset = VIEWS[v.name];
+        if (!preset) return;
+        camTween = {
+          pos: new THREE.Vector3(...preset.pos),
+          tgt: new THREE.Vector3(...preset.tgt),
+        };
+        invalidate();
+      }),
+      quality.subscribe(applyQuality),
     ];
 
-    // ── 포인터 타건 ──
     const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     let downX = 0,
@@ -1165,11 +1232,14 @@
     function onDown(e: PointerEvent) {
       downX = e.clientX;
       downY = e.clientY;
+      camTween = null;
       const ch = socketAt(e);
       if (ch) {
         dragFrom = ch;
         controls.enabled = false;
+        highlightSockets(ch, null);
       }
+      invalidate();
     }
     function onMove(e: PointerEvent) {
       if (!dragFrom) return;
@@ -1185,6 +1255,7 @@
         to = planeHit;
       }
       drawPreview(from, to);
+      highlightSockets(dragFrom, over && over !== dragFrom ? over : null);
     }
     function onUp(e: PointerEvent) {
       if (dragFrom) {
@@ -1196,6 +1267,7 @@
           connectPlug(dragFrom, target);
         }
         clearPreview();
+        highlightSockets(null, null);
         dragFrom = null;
         controls.enabled = true;
         return;
@@ -1216,6 +1288,7 @@
       renderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      invalidate();
     }
     const ro = new ResizeObserver(resize);
     ro.observe(host);
@@ -1224,29 +1297,65 @@
     let raf = 0;
     function loop() {
       raf = requestAnimationFrame(loop);
+      let animating = false;
       for (const ch in keyGroups) {
         const g = keyGroups[ch];
-        const ty = ch === pressedCh ? TOP - 0.13 : TOP;
-        g.position.y += (ty - g.position.y) * 0.4;
+        const d = (ch === pressedCh ? TOP - 0.13 : TOP) - g.position.y;
+        if (Math.abs(d) > 0.001) {
+          g.position.y += d * 0.4;
+          animating = true;
+        }
       }
       for (let r = 0; r < 3; r++) {
         const s = rotorSpins[r];
-        s.rotation.x += (targetRot[r] - s.rotation.x) * 0.18;
+        const d = targetRot[r] - s.rotation.x;
+        if (Math.abs(d) > 0.0005) {
+          s.rotation.x += d * 0.18;
+          animating = true;
+        }
       }
       {
-        const lt = lidOpen ? LID_OPEN : LID_SHUT;
-        lidPivot.rotation.x += (lt - lidPivot.rotation.x) * 0.12;
-        const ft = lidOpen ? FLAP_OPEN : FLAP_SHUT;
-        flapPivot.rotation.x += (ft - flapPivot.rotation.x) * 0.12;
-        const ct = rotorCoverOpen && lidOpen ? ROTORLID_OPEN : ROTORLID_SHUT;
-        rotorLidPivot.rotation.x += (ct - rotorLidPivot.rotation.x) * 0.12;
+        const d1 = (lidOpen ? LID_OPEN : LID_SHUT) - lidPivot.rotation.x;
+        if (Math.abs(d1) > 0.0005) {
+          lidPivot.rotation.x += d1 * 0.12;
+          animating = true;
+        }
+        const d2 = (lidOpen ? FLAP_OPEN : FLAP_SHUT) - flapPivot.rotation.x;
+        if (Math.abs(d2) > 0.0005) {
+          flapPivot.rotation.x += d2 * 0.12;
+          animating = true;
+        }
+        const d3 =
+          (rotorCoverOpen && lidOpen ? ROTORLID_OPEN : ROTORLID_SHUT) -
+          rotorLidPivot.rotation.x;
+        if (Math.abs(d3) > 0.0005) {
+          rotorLidPivot.rotation.x += d3 * 0.12;
+          animating = true;
+        }
+      }
+      if (camTween) {
+        camera.position.lerp(camTween.pos, 0.14);
+        controls.target.lerp(camTween.tgt, 0.14);
+        if (camera.position.distanceTo(camTween.pos) < 0.03) camTween = null;
+        animating = true;
       }
       if (active && activeCurve && spark.visible) {
-        const dt = ((performance.now() - sparkT0) / 900) % 1;
-        spark.position.copy(activeCurve.getPointAt(dt));
+        const dt = (performance.now() - sparkT0) / 900;
+        if (dt <= 2) {
+          spark.position.copy(activeCurve.getPointAt(dt % 1));
+          animating = true;
+        } else {
+          spark.visible = false;
+          needsRender = true;
+        }
       }
       controls.update();
-      renderer.render(scene, camera);
+      if (animating) needsRender = true;
+      if (needsRender) {
+        needsRender = false;
+        renderer.render(scene, camera);
+        fpsSample();
+      }
     }
     raf = requestAnimationFrame(loop);
 
@@ -1257,6 +1366,7 @@
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointermove", onMove);
       renderer.domElement.removeEventListener("pointerup", onUp);
+      controls.removeEventListener("change", invalidate);
       clearPreview();
       controls.dispose();
       clearCables();

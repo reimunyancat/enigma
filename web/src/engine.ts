@@ -22,6 +22,7 @@ type WasmModule = {
 
 let mod: WasmModule | null = null;
 let _init: (r: string, rf: string, ri: string, p: string, pl: string) => number;
+let _press: (c: number) => number;
 let _trace: (c: number) => string;
 let _positions: () => string;
 
@@ -35,6 +36,7 @@ export async function loadEngine(): Promise<void> {
     "string",
     "string",
   ]);
+  _press = mod!.cwrap("enigma_press", "number", ["number"]);
   _trace = mod!.cwrap("enigma_trace", "string", ["number"]);
   _positions = mod!.cwrap("enigma_positions", "string", []);
 }
@@ -49,6 +51,10 @@ export function configure(cfg: EnigmaConfig): boolean {
       cfg.plugs,
     ) === 1
   );
+}
+
+export function pressLetter(letter: string): string {
+  return String.fromCharCode(_press(letter.charCodeAt(0)));
 }
 
 export function trace(letter: string): Trace | null {
