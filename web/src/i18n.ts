@@ -23,6 +23,7 @@ export interface Messages {
   output: string;
   copy: string;
   copied: string;
+  share: string;
   clear: string;
   group5: string;
   quality: string;
@@ -51,6 +52,21 @@ export interface Messages {
   crackUse: string;
   crackUseOutput: string;
   crackResultEmpty: string;
+  challenges: string;
+  challengesTitle: string;
+  challengesIntro: string;
+  challengeDecrypt: string;
+  challengeCrack: string;
+  challengeMeaning: string;
+  challengeCrackCrib: string;
+  crackModeStat: string;
+  crackModeCrib: string;
+  crackCribPlaceholder: string;
+  crackCribOffsetPh: string;
+  crackCribImpossible: string;
+  crackCribTooShort: string;
+  crackPreparing: string;
+  crackWorkerError: string;
 }
 
 const dict: Record<Lang, Messages> = {
@@ -75,6 +91,7 @@ const dict: Record<Lang, Messages> = {
     output: "OUT",
     copy: "Copy",
     copied: "Copied",
+    share: "Share",
     clear: "Clear",
     group5: "Groups of 5",
     quality: "Quality",
@@ -118,6 +135,23 @@ const dict: Record<Lang, Messages> = {
     crackUse: "Apply",
     crackUseOutput: "Crack the current output",
     crackResultEmpty: "No candidates.",
+    challenges: "Challenges",
+    challengesTitle: "Historical intercepts",
+    challengesIntro:
+      "Real Wehrmacht messages intercepted in 1941 — keys recovered by modern cryptanalysis (Ostwald & Weierud, Cryptologia 2017). Read them with the day's key, or crack the start position where the text is long enough. The short ones defeat statistics alone; that is what cribs were for.",
+    challengeDecrypt: "Load key & decrypt",
+    challengeCrack: "Crack positions",
+    challengeMeaning: "Meaning",
+    challengeCrackCrib: "Crack with crib",
+    crackModeStat: "Statistics (IoC)",
+    crackModeCrib: "Crib (known plaintext)",
+    crackCribPlaceholder: "Known plaintext fragment (crib), e.g. MELDUNG",
+    crackCribOffsetPh: "Offset (blank = search all)",
+    crackCribImpossible:
+      "Impossible at that offset — a letter would encrypt to itself.",
+    crackCribTooShort: "Crib needs at least 3 letters.",
+    crackPreparing: "Preparing the engine…",
+    crackWorkerError: "Cracker failed to run — see console",
   },
   ko: {
     loading: "엔진 불러오는 중…",
@@ -140,6 +174,7 @@ const dict: Record<Lang, Messages> = {
     output: "출력",
     copy: "복사",
     copied: "복사됨",
+    share: "링크 공유",
     clear: "지우기",
     group5: "5글자 묶음",
     quality: "품질",
@@ -183,6 +218,23 @@ const dict: Record<Lang, Messages> = {
     crackUse: "적용",
     crackUseOutput: "현재 출력 크랙",
     crackResultEmpty: "후보가 없습니다.",
+    challenges: "챌린지",
+    challengesTitle: "역사 실전 전문",
+    challengesIntro:
+      "1941년에 실제로 가로챈 독일 국방군 전문들 — 현대 암호해독으로 키가 복구된 것들입니다 (Ostwald & Weierud, Cryptologia 2017). 일일 키로 바로 읽거나, 문장이 충분히 긴 것은 초기 위치를 직접 크랙해 보세요. 짧은 것들은 통계만으로는 무리입니다 — 역사적으로 크리브가 필요했던 이유입니다.",
+    challengeDecrypt: "일일 키로 복호",
+    challengeCrack: "위치 크랙",
+    challengeMeaning: "의미",
+    challengeCrackCrib: "크리브로 크랙",
+    crackModeStat: "통계 (IoC)",
+    crackModeCrib: "크리브 (평문 조각)",
+    crackCribPlaceholder: "알려진 평문 조각 — 예: MELDUNG",
+    crackCribOffsetPh: "오프셋 (비우면 전체 탐색)",
+    crackCribImpossible:
+      "그 위치엔 올 수 없습니다 — 글자가 자기 자신으로 암호화됩니다.",
+    crackCribTooShort: "크리브는 최소 3글자 필요합니다.",
+    crackPreparing: "엔진 준비 중…",
+    crackWorkerError: "크랙 워커 실행 실패 — 콘솔 확인",
   },
 };
 

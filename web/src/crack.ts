@@ -29,6 +29,11 @@ const ENGLISH_FREQ = [
   6.75, 7.51, 1.93, 0.1, 5.99, 6.33, 9.06, 2.76, 0.98, 2.36, 0.15, 1.97, 0.07,
 ];
 
+const GERMAN_FREQ = [
+  6.5, 1.9, 3.0, 5.1, 16.4, 1.7, 3.0, 4.8, 7.6, 0.27, 1.4, 3.4, 2.5, 9.8, 2.5,
+  0.8, 0.02, 7.0, 7.3, 6.2, 4.2, 0.7, 1.9, 0.03, 0.04, 1.1,
+];
+
 export function scoreText(text: string): number {
   const n = text.length;
   if (n < 2) return 0;
@@ -37,11 +42,15 @@ export function scoreText(text: string): number {
   let sum = 0;
   for (const c of counts) sum += c * (c - 1);
   const ioc = sum / (n * (n - 1));
-  let chi2 = 0;
-  for (let i = 0; i < 26; i++) {
-    const e = (ENGLISH_FREQ[i] / 100) * n;
-    const d = counts[i] - e;
-    chi2 += (d * d) / e;
+  let chi2 = Infinity;
+  for (const freq of [ENGLISH_FREQ, GERMAN_FREQ]) {
+    let x = 0;
+    for (let i = 0; i < 26; i++) {
+      const e = (freq[i] / 100) * n;
+      const d = counts[i] - e;
+      x += (d * d) / e;
+    }
+    if (x < chi2) chi2 = x;
   }
   return ioc - 0.012 * Math.min(chi2 / n, 3);
 }
@@ -131,4 +140,91 @@ export async function runCrack(
   top.sort((a, b) => b.score - a.score);
   onProgress?.(total, total);
   return top.slice(0, 5);
+}
+
+export interface CribHit {
+  rotors: string[];
+  reflector: string;
+  positions: string;
+  matches: number;
+  offset: number;
+  preview: string;
+}
+
+export async function runCrib(
+  engine: CrackEngine,
+  cipherRaw: string,
+  cribRaw: string,
+  base: CrackBase,
+  fullScope: boolean,
+  fixedOffset: number | null,
+  onProgress?: (done: number, total: number) => void,
+): Promise<CribHit[]> {
+  const cipher = cipherRaw.toUpperCase().replace(/[^A-Z]/g, "");
+  const crib = cribRaw.toUpperCase().replace(/[^A-Z]/g, "");
+  const L = crib.length;
+  if (L < 3 || cipher.length < L) return [];
+  const offsets: number[] = [];
+  if (
+    fixedOffset !== null &&
+    fixedOffset >= 0 &&
+    fixedOffset + L <= cipher.length
+  ) {
+    offsets.push(fixedOffset);
+  } else {
+    for (let o = 0; o + L <= cipher.length; o++) {
+      let ok = true;
+      for (let i = 0; i < L; i++)
+        if (crib[i] === cipher[o + i]) {
+          ok = false;
+          break;
+        }
+      if (ok) offsets.push(o);
+    }
+  }
+  if (offsets.length === 0) return [];
+  const orders = fullScope ? rotorOrders() : [base.rotors];
+  const reflectors = fullScope ? REFLECTOR_NAMES : [base.reflector];
+  const total = orders.length * reflectors.length * 17576;
+  let done = 0;
+  const hits: CribHit[] = [];
+  let sinceYield = 0;
+  for (const rotors of orders) {
+    for (const reflector of reflectors) {
+      for (let p = 0; p < 17576; p++) {
+        engine.configure({
+          rotors,
+          reflector,
+          rings: base.rings,
+          positions: posLetters(p),
+          plugs: base.plugs,
+        });
+        let out = "";
+        for (const ch of cipher) out += engine.pressLetter(ch);
+        for (const o of offsets) {
+          let matches = 0;
+          for (let i = 0; i < L; i++) if (out[o + i] === crib[i]) matches++;
+          if (matches >= Math.max(3, Math.ceil(L * 0.6))) {
+            hits.push({
+              rotors,
+              reflector,
+              positions: posLetters(p),
+              matches,
+              offset: o,
+              preview: out.slice(Math.max(0, o - 8), o + L + 8),
+            });
+          }
+        }
+        done++;
+        if (++sinceYield >= 2197) {
+          sinceYield = 0;
+          onProgress?.(done, total);
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+    }
+  }
+  hits.sort((a, b) => b.matches - a.matches);
+  onProgress?.(total, total);
+  return hits.slice(0, 5);
 }

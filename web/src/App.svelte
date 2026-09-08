@@ -17,12 +17,15 @@
     guideOpen,
     crackOpen,
     clearText,
+    shareUrl,
+    challengesOpen,
   } from "./machine";
   import { t, lang } from "./i18n";
   import type { Quality } from "./machine";
   import Config from "./lib/Config.svelte";
   import Machine3D from "./lib/Machine3D.svelte";
   import Guide from "./lib/Guide.svelte";
+  import Challenge from "./lib/Challenge.svelte";
   import Crack from "./lib/Crack.svelte";
 
   onMount(boot);
@@ -52,6 +55,14 @@
       setTimeout(() => (copied = false), 1200);
     } catch {}
   }
+  let shared = false;
+  async function shareLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl());
+      shared = true;
+      setTimeout(() => (shared = false), 1200);
+    } catch {}
+  }
 </script>
 
 <svelte:window on:keydown={onKey} />
@@ -68,6 +79,11 @@
       <button class:on={$crackOpen} on:click={() => crackOpen.update((v) => !v)}
         >{$t.crack}</button
       >
+      <button
+        class:on={$challengesOpen}
+        on:click={() => challengesOpen.update((v) => !v)}
+        >{$t.challenges}</button
+      >
       <select
         value={$quality}
         on:change={(e) => quality.set(e.currentTarget.value as Quality)}
@@ -80,6 +96,7 @@
       <button on:click={() => lang.update((v) => (v === "en" ? "ko" : "en"))}>
         {$lang === "en" ? "한국어" : "EN"}
       </button>
+      <button on:click={shareLink}>{shared ? $t.copied : $t.share}</button>
     </div>
   </header>
   <Guide />
@@ -135,6 +152,7 @@
       >
     </div>
   </div>
+  <Challenge />
   <Crack />
 {/if}
 

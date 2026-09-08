@@ -1,8 +1,8 @@
 <script lang="ts">
   import { get } from "svelte/store";
-  import { config, patch, crackOpen, output } from "../machine";
+  import { config, patch, crackOpen, crackSeed, output } from "../machine";
   import { t } from "../i18n";
-  import type { Candidate } from "../crack";
+  import type { Candidate, CribHit } from "../crack";
   import type { Reflector, Rotor } from "../engine";
 
   let cipher = "";
@@ -10,15 +10,48 @@
   let running = false;
   let done = 0;
   let total = 0;
-  let results: Candidate[] | null = null;
+  let results: (Candidate | CribHit)[] | null = null;
   let errorMsg = "";
   let worker: Worker | null = null;
+  let cribMode = false;
+  let crib = "";
+  let cribOffset = "";
+
+  crackSeed.subscribe((v) => {
+    if (v) {
+      cipher = v.cipher;
+      if (v.crib) {
+        crib = v.crib;
+        cribMode = true;
+      }
+      crackSeed.set(null);
+    }
+  });
 
   function start() {
     const clean = cipher.toUpperCase().replace(/[^A-Z]/g, "");
     if (clean.length < 30) {
       errorMsg = $t.crackTooShort;
       return;
+    }
+    let cribClean = "";
+    let off: number | null = null;
+    if (cribMode) {
+      cribClean = crib.toUpperCase().replace(/[^A-Z]/g, "");
+      if (cribClean.length < 3) {
+        errorMsg = $t.crackCribTooShort;
+        return;
+      }
+      if (cribOffset.trim() !== "") {
+        const n = parseInt(cribOffset, 10);
+        off = Number.isFinite(n) && n >= 0 ? n : null;
+        if (off !== null && off + cribClean.length <= clean.length)
+          for (let i = 0; i < cribClean.length; i++)
+            if (cribClean[i] === clean[off + i]) {
+              errorMsg = $t.crackCribImpossible;
+              return;
+            }
+      }
     }
     errorMsg = "";
     results = null;
@@ -46,9 +79,23 @@
         worker = null;
       }
     };
+    worker.onerror = (e) => {
+      errorMsg = `${$t.crackWorkerError}: ${e.message ?? "unknown"}`;
+      running = false;
+      worker?.terminate();
+      worker = null;
+    };
+    worker.onmessageerror = () => {
+      errorMsg = $t.crackWorkerError;
+      running = false;
+      worker?.terminate();
+      worker = null;
+    };
     const c = get(config);
     worker.postMessage({
       cipher: clean,
+      crib: cribMode ? cribClean : undefined,
+      offset: off,
       base: {
         rotors: [...c.rotors],
         reflector: c.reflector,
@@ -65,7 +112,7 @@
     running = false;
   }
 
-  function applyResult(r: Candidate) {
+  function applyResult(r: Candidate | CribHit) {
     patch({
       rotors: r.rotors as [Rotor, Rotor, Rotor],
       reflector: r.reflector as Reflector,
@@ -84,7 +131,29 @@
       placeholder={$t.crackPlaceholder}
       spellcheck="false"
       disabled={running}></textarea>
+    {#if cribMode}
+      <div class="row cribrow">
+        <input
+          class="crib"
+          bind:value={crib}
+          placeholder={$t.crackCribPlaceholder}
+          spellcheck="false"
+          disabled={running}
+        />
+        <input
+          class="off"
+          bind:value={cribOffset}
+          placeholder={$t.crackCribOffsetPh}
+          spellcheck="false"
+          disabled={running}
+        />
+      </div>
+    {/if}
     <div class="row">
+      <select bind:value={cribMode} disabled={running}>
+        <option value={false}>{$t.crackModeStat}</option>
+        <option value={true}>{$t.crackModeCrib}</option>
+      </select>
       <select bind:value={fullScope} disabled={running}>
         <option value={false}>{$t.crackScopePos}</option>
         <option value={true}>{$t.crackScopeFull}</option>
@@ -95,8 +164,12 @@
       {#if running}
         <button on:click={cancel}>{$t.crackCancel}</button>
         <span class="status">
-          {$t.crackRunning}
-          {total ? Math.floor((done / total) * 100) : 0}%</span
+          {#if total > 0}
+            {$t.crackRunning}
+            {Math.floor((done / total) * 100)}%
+          {:else}
+            {$t.crackPreparing}
+          {/if}</span
         >
       {:else}
         <button class="primary" on:click={start}>{$t.crackStart}</button>
@@ -122,7 +195,11 @@
                 <span class="pos"
                   >{r.rotors.join("·")} / {r.reflector} / {r.positions}</span
                 >
-                <span class="score">{r.score.toFixed(4)}</span>
+                <span class="score"
+                  >{"matches" in r
+                    ? `${r.matches} @${r.offset}`
+                    : r.score.toFixed(4)}</span
+                >
                 <button on:click={() => applyResult(r)}>{$t.crackUse}</button>
               </div>
               <div class="preview">{r.preview}</div>
@@ -270,5 +347,23 @@
     letter-spacing: 2px;
     opacity: 0.85;
     word-break: break-all;
+  }
+  .cribrow input {
+    background: #100b06;
+    color: var(--txt);
+    border: 1px solid var(--wood3);
+    border-radius: 7px;
+    padding: 7px 9px;
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .crib {
+    flex: 1;
+    min-width: 200px;
+  }
+  .off {
+    width: 220px;
   }
 </style>
