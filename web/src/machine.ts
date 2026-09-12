@@ -30,10 +30,13 @@ export const viewPreset = writable<{ name: string } | null>(null);
 export const group5 = writable(false);
 export const guideOpen = writable(true);
 export const crackOpen = writable(false);
-export const crackSeed = writable<{ cipher: string; crib?: string } | null>(
-  null,
-);
+export const crackSeed = writable<{
+  cipher: string;
+  crib?: string;
+  auto?: boolean;
+} | null>(null);
 export const challengesOpen = writable(false);
+export const demoRunning = writable(false);
 
 export type Quality = "auto" | "high" | "low";
 
@@ -145,6 +148,31 @@ export function shareUrl(): string {
   const head = `${c.rotors.join(".")}.${c.reflector}:${c.rings}:${c.positions}:${c.plugs}`;
   const hash = cipher ? `${head}:${cipher}` : head;
   return `${location.origin}${location.pathname}#${hash}`;
+}
+
+export function stopDemo(): void {
+  demoRunning.set(false);
+}
+
+export async function runDemo(): Promise<void> {
+  if (get(demoRunning)) return;
+  demoRunning.set(true);
+  guideOpen.set(false);
+  patch({ ...defaultConfig });
+  const text = "WETTERVORHERSAGE";
+  for (let i = 0; i < text.length; i++) {
+    if (!get(demoRunning)) break;
+    if (i === 3) xray.set(true);
+    if (i === 9) xray.set(false);
+    await press(text[i]);
+    await wait(160);
+  }
+  xray.set(false);
+  if (get(demoRunning)) {
+    crackSeed.set({ cipher: get(output), crib: "WETTER", auto: true });
+    crackOpen.set(true);
+  }
+  demoRunning.set(false);
 }
 
 export async function press(ch: string): Promise<void> {

@@ -28,8 +28,13 @@
     reflectorPerm,
   } from "./rotorData";
   import type { Trace } from "../engine";
+  import { t } from "../i18n";
 
   let host: HTMLDivElement;
+  let replaying = false;
+  let replayLabel = "";
+  let replayStages: { name: string; t0: number; t1: number }[] = [];
+  let replayApi: { start: () => void } = { start: () => {} };
 
   onMount(() => {
     const scene = new THREE.Scene();
@@ -1010,11 +1015,24 @@
     spark.visible = false;
     wiring.add(spark);
 
+    let replayT0 = 0;
+    replayApi = {
+      start: () => {
+        if (replaying || !activeCurve || replayStages.length === 0) return;
+        replaying = true;
+        replayLabel = "";
+        replayT0 = performance.now();
+        spark.visible = true;
+        invalidate();
+      },
+    };
+
     let active: THREE.Mesh | null = null;
     let activeCurve: THREE.CatmullRomCurve3 | null = null;
     let sparkT0 = 0;
 
     function buildActive(tr: (Trace & { seq: number }) | null) {
+      replaying = false;
       if (active) {
         wiring.remove(active);
         active.geometry.dispose();
@@ -1041,12 +1059,14 @@
       const inCh = get(lastKey);
       const keyGrp = inCh ? keyGroups[inCh] : null;
       const v: THREE.Vector3[] = [];
+      const stageIdx = [0, 0, 0, 0, 0];
       if (keyGrp) {
         v.push(keyGrp.position.clone().setY(TOP + 0.12));
         v.push(keyGrp.position.clone().setY(TOP - 0.4));
       }
       v.push(sock(p[0]));
       if (p[0] !== p[1]) v.push(cableMid(p[0], p[1]), sock(p[1]));
+      stageIdx[1] = v.length;
       v.push(
         contact(CX.etw + 0.2, p[1]),
         contact(CX.etw - 0.2, p[1]),
@@ -1056,8 +1076,11 @@
         contact(CX.M - FACE, p[3]),
         contact(CX.L + FACE, p[3]),
         contact(CX.L - FACE, p[4]),
-        contact(CX.refl + 0.21, p[4]),
-        contact(CX.refl + 0.21, p[5]),
+      );
+      stageIdx[2] = v.length;
+      v.push(contact(CX.refl + 0.21, p[4]), contact(CX.refl + 0.21, p[5]));
+      stageIdx[3] = v.length;
+      v.push(
         contact(CX.L - FACE, p[5]),
         contact(CX.L + FACE, p[6]),
         contact(CX.M - FACE, p[6]),
@@ -1067,6 +1090,7 @@
         contact(CX.etw - 0.2, p[8]),
         contact(CX.etw + 0.2, p[8]),
       );
+      stageIdx[4] = v.length;
       v.push(sock(p[8]));
       if (p[8] !== p[9]) v.push(cableMid(p[8], p[9]), sock(p[9]));
       const outLamp = lampPos[tr.output];
@@ -1075,17 +1099,19 @@
         v.push(outLamp.clone());
       }
       activeCurve = new THREE.CatmullRomCurve3(v);
-      const tube = new THREE.TubeGeometry(activeCurve, 220, 0.055, 8, false);
-      active = new THREE.Mesh(
-        tube,
-        new THREE.MeshStandardMaterial({
-          color: 0xffcf4d,
-          emissive: 0xffcf4d,
-          emissiveIntensity: 1.6,
-          transparent: true,
-          opacity: 0.95,
-        }),
-      );
+      const lens: number[] = [0];
+      for (let i = 1; i < v.length; i++)
+        lens.push(lens[i - 1] + v[i].distanceTo(v[i - 1]));
+      const totalLen = lens[lens.length - 1] || 1;
+      const tt = (i: number) =>
+        lens[Math.max(0, Math.min(i, v.length - 1))] / totalLen;
+      replayStages = [
+        { name: "KEY → PLUGBOARD", t0: tt(0), t1: tt(stageIdx[1]) },
+        { name: "ROTORS R→M→L", t0: tt(stageIdx[1]), t1: tt(stageIdx[2]) },
+        { name: "REFLECTOR", t0: tt(stageIdx[2]), t1: tt(stageIdx[3]) },
+        { name: "ROTORS L←M←R", t0: tt(stageIdx[3]), t1: tt(stageIdx[4]) },
+        { name: "PLUGBOARD → LAMP", t0: tt(stageIdx[4]), t1: 1 },
+      ];
       wiring.add(active);
       spark.visible = true;
       sparkT0 = performance.now();
@@ -1339,7 +1365,27 @@
         if (camera.position.distanceTo(camTween.pos) < 0.03) camTween = null;
         animating = true;
       }
-      if (active && activeCurve && spark.visible) {
+      if (replaying && activeCurve) {
+        const dt = (performance.now() - replayT0) / 6500;
+        if (dt >= 1) {
+          replaying = false;
+          replayLabel = "";
+          spark.visible = false;
+          needsRender = true;
+        } else {
+          const n = replayStages.length;
+          const x = dt * n;
+          const k = Math.min(n - 1, Math.floor(x));
+          const f = x - k;
+          const st = replayStages[k];
+          const f2 = f < 0.82 ? f / 0.82 : 1;
+          spark.position.copy(
+            activeCurve.getPointAt(st.t0 + (st.t1 - st.t0) * f2),
+          );
+          if (replayLabel !== st.name) replayLabel = st.name;
+          animating = true;
+        }
+      } else if (active && activeCurve && spark.visible) {
         const dt = (performance.now() - sparkT0) / 900;
         if (dt <= 2) {
           spark.position.copy(activeCurve.getPointAt(dt % 1));
@@ -1380,7 +1426,17 @@
   });
 </script>
 
-<div class="viewport" bind:this={host}></div>
+<div class="viewport" bind:this={host}>
+  {#if $lastTrace}
+    <button
+      class="replay"
+      class:on={replaying}
+      disabled={replaying}
+      on:click={() => replayApi.start()}
+      >{replaying && replayLabel ? replayLabel : $t.replay}</button
+    >
+  {/if}
+</div>
 
 <style>
   .viewport {
@@ -1393,8 +1449,35 @@
     border: 1px solid #000;
     box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.7);
     touch-action: none;
+    position: relative;
   }
   .viewport :global(canvas) {
     display: block;
+  }
+
+  .replay {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 4;
+    padding: 7px 12px;
+    font:
+      600 12px/1 ui-monospace,
+      monospace;
+    letter-spacing: 0.5px;
+    color: #d8c49a;
+    background: rgba(20, 17, 13, 0.72);
+    border: 1px solid #6b5a2a;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .replay:hover {
+    border-color: #c9a24b;
+    color: #ffe169;
+  }
+  .replay.on {
+    color: #14110d;
+    background: #ffcf4d;
+    border-color: #ffcf4d;
   }
 </style>

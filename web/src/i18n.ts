@@ -67,6 +67,8 @@ export interface Messages {
   crackCribTooShort: string;
   crackPreparing: string;
   crackWorkerError: string;
+  tryMe: string;
+  demoCancel: string;
 }
 
 const dict: Record<Lang, Messages> = {
@@ -152,6 +154,8 @@ const dict: Record<Lang, Messages> = {
     crackCribTooShort: "Crib needs at least 3 letters.",
     crackPreparing: "Preparing the engine…",
     crackWorkerError: "Cracker failed to run — see console",
+    tryMe: "Try me",
+    demoCancel: "Stop demo",
   },
   ko: {
     loading: "엔진 불러오는 중…",
@@ -235,6 +239,8 @@ const dict: Record<Lang, Messages> = {
     crackCribTooShort: "크리브는 최소 3글자 필요합니다.",
     crackPreparing: "엔진 준비 중…",
     crackWorkerError: "크랙 워커 실행 실패 — 콘솔 확인",
+    tryMe: "자동 시연",
+    demoCancel: "시연 중지",
   },
 };
 

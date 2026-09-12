@@ -19,6 +19,9 @@
     clearText,
     shareUrl,
     challengesOpen,
+    demoRunning,
+    runDemo,
+    stopDemo,
   } from "./machine";
   import { t, lang } from "./i18n";
   import type { Quality } from "./machine";
@@ -73,6 +76,11 @@
   <header class="top">
     <span class="brand">ENIGMA I</span>
     <div class="actions">
+      <button
+        class:on={$demoRunning}
+        on:click={() => ($demoRunning ? stopDemo() : runDemo())}
+        >{$demoRunning ? $t.demoCancel : $t.tryMe}</button
+      >
       <button class:on={$guideOpen} on:click={() => guideOpen.update((v) => !v)}
         >{$t.guide}</button
       >

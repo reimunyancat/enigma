@@ -25,6 +25,7 @@
         cribMode = true;
       }
       crackSeed.set(null);
+      if (v.auto) start();
     }
   });
 
