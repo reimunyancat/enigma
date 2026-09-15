@@ -162,15 +162,8 @@ export async function runDemo(): Promise<void> {
   const text = "WETTERVORHERSAGE";
   for (let i = 0; i < text.length; i++) {
     if (!get(demoRunning)) break;
-    if (i === 3) xray.set(true);
-    if (i === 9) xray.set(false);
     await press(text[i]);
     await wait(160);
-  }
-  xray.set(false);
-  if (get(demoRunning)) {
-    crackSeed.set({ cipher: get(output), crib: "WETTER", auto: true });
-    crackOpen.set(true);
   }
   demoRunning.set(false);
 }

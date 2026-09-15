@@ -69,6 +69,7 @@ export interface Messages {
   crackWorkerError: string;
   tryMe: string;
   demoCancel: string;
+  replay: string;
 }
 
 const dict: Record<Lang, Messages> = {
@@ -156,6 +157,7 @@ const dict: Record<Lang, Messages> = {
     crackWorkerError: "Cracker failed to run — see console",
     tryMe: "Try me",
     demoCancel: "Stop demo",
+    replay: "Slow replay",
   },
   ko: {
     loading: "엔진 불러오는 중…",
@@ -241,6 +243,7 @@ const dict: Record<Lang, Messages> = {
     crackWorkerError: "크랙 워커 실행 실패 — 콘솔 확인",
     tryMe: "자동 시연",
     demoCancel: "시연 중지",
+    replay: "슬로모션 재생",
   },
 };
 

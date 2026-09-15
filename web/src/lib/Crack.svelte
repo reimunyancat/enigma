@@ -31,16 +31,16 @@
 
   function start() {
     const clean = cipher.toUpperCase().replace(/[^A-Z]/g, "");
-    if (clean.length < 30) {
-      errorMsg = $t.crackTooShort;
-      return;
-    }
     let cribClean = "";
     let off: number | null = null;
     if (cribMode) {
       cribClean = crib.toUpperCase().replace(/[^A-Z]/g, "");
       if (cribClean.length < 3) {
         errorMsg = $t.crackCribTooShort;
+        return;
+      }
+      if (clean.length < cribClean.length) {
+        errorMsg = $t.crackTooShort;
         return;
       }
       if (cribOffset.trim() !== "") {
@@ -52,10 +52,13 @@
               errorMsg = $t.crackCribImpossible;
               return;
             }
+      } else if (clean.length < 30) {
+        errorMsg = $t.crackTooShort;
+        return;
       }
+      errorMsg = "";
+      results = null;
     }
-    errorMsg = "";
-    results = null;
     running = true;
     done = 0;
     total = 0;
